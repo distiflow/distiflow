@@ -1,0 +1,46 @@
+# Task kinds. Each kind sets what every stage leans on.
+
+[kinds.feature]
+summary = "New behaviour: full behaviour and plan stages."
+emphasis.understand = "Pin the behaviour: journeys, sad paths, acceptance criteria."
+emphasis.plan = "Full plan: interfaces, tasks, tests per task."
+emphasis.implement = "Test first, task by task."
+emphasis.verify = "Every acceptance criterion has passing evidence."
+emphasis.review = "Whole change against the agreed behaviour."
+emphasis.ship = "Branch, gates green, hand-off."
+
+[kinds.fix]
+summary = "Known defect: a short understand stage and a regression check."
+emphasis.understand = "Short: the defect, where it lives, how to see it."
+emphasis.plan = "Smallest change at the root cause."
+emphasis.implement = "Failing regression test first, then the fix."
+emphasis.verify = "The regression test fails without the fix and passes with it."
+emphasis.review = "Root cause fixed once, callers checked."
+emphasis.ship = "Branch, gates green, hand-off."
+
+[kinds.debug]
+summary = "Unknown cause: reproduction and evidence first, a light plan stage."
+emphasis.understand = "Reproduce first; collect evidence before any theory."
+emphasis.plan = "Light: the hypothesis to test next."
+emphasis.implement = "Change one thing at a time, keep the evidence."
+emphasis.verify = "The reproduction no longer reproduces."
+emphasis.review = "Cause explained by the evidence, not guessed."
+emphasis.ship = "Branch, gates green, hand-off."
+
+[kinds.perf]
+summary = "Performance: a measured baseline first and a before/after comparison as a gate."
+emphasis.understand = "Measure a baseline before touching anything."
+emphasis.plan = "Name the metric, the target and how it is measured."
+emphasis.implement = "One optimisation at a time, measured."
+emphasis.verify = "Before/after comparison on the same measurement."
+emphasis.review = "The gain is real and nothing else regressed."
+emphasis.ship = "Branch, gates green, hand-off."
+
+[kinds.ux]
+summary = "User experience: journeys and visual review first, a check in the running app as a gate."
+emphasis.understand = "Journeys and visual review first."
+emphasis.plan = "Screens and states each journey touches."
+emphasis.implement = "Build the journey end to end."
+emphasis.verify = "Check the journeys in the running app."
+emphasis.review = "Visual and accessibility review."
+emphasis.ship = "Branch, gates green, hand-off."

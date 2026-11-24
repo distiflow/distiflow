@@ -1,0 +1,23 @@
+# Numeric limits. A project changes them through .golden/overrides/limits.toml.
+
+[claim]
+stale_after_seconds = 1800
+
+[subagents]
+per_stage = 3
+
+# Token budget per stage for loaded practices (gates count first and are never dropped).
+[budget]
+understand = 6000
+plan = 6000
+implement = 4000
+verify = 3000
+review = 5000
+ship = 2000
+
+[practice]
+max_tokens = 1500
+
+[contribute]
+shortlist = 5
+similar_threshold = 0.6

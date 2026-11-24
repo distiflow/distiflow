@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -11,6 +12,46 @@ REPO = Path(__file__).resolve().parents[1]
 BIN = REPO / "bin" / "golden"
 # Every integration test runs under a path with a space and non-ASCII characters.
 TMP_PARENT = Path(tempfile.gettempdir()).resolve() / "gw tmp ü"
+KINDS = ("feature", "fix", "debug", "perf", "ux")
+
+
+def w(path, text):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
+def header(sha, version="0.1.0"):
+    return "<!-- golden-override upstream=%s version=%s -->\n" % (sha, version)
+
+
+def sha_of(root, rel):
+    return hashlib.sha256((Path(root) / "core" / rel).read_bytes()).hexdigest()
+
+
+def _toml_list(xs):
+    return "[" + ", ".join('"%s"' % x for x in xs) + "]"
+
+
+def practice(id, stages, kinds=None, signals=None, run_cost="cheap", gate=False, evidence="",
+             priority=50, body="text"):
+    if gate and not evidence:
+        evidence = "e"
+    lines = ["+++", 'id = "%s"' % id, "stages = " + _toml_list(stages)]
+    if kinds is not None:
+        lines.append("kinds = " + _toml_list(kinds))
+    if signals is not None:
+        lines.append("signals = " + _toml_list(signals))
+    lines += ['run_cost = "%s"' % run_cost, "gate = " + ("true" if gate else "false"),
+              'evidence = "%s"' % evidence, "priority = %d" % priority, "+++", body, ""]
+    return "\n".join(lines)
+
+
+def write_profile(repo, committed='[project]\nname = "proj"\n[git]\npush = "forbidden"\n', local=None):
+    w(Path(repo) / ".golden" / "profile.toml", committed)
+    if local is not None:
+        w(Path(repo) / ".golden" / "profile.local.toml", local)
 
 
 class GoldenCase(unittest.TestCase):
@@ -55,6 +96,22 @@ class GoldenCase(unittest.TestCase):
     def git(self, *args, cwd):
         return subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True,
                               capture_output=True, text=True).stdout
+
+    def fixture_root(self, version="0.1.0", practices={}, stages={}, changelog=None):
+        root = Path(tempfile.mkdtemp(dir=self.tmp, prefix="root"))
+        (root / "core").mkdir()
+        for f in (REPO / "core").glob("*.toml"):
+            shutil.copy(f, root / "core" / f.name)
+        shutil.copytree(REPO / ".claude-plugin", root / ".claude-plugin")
+        meta = root / ".claude-plugin" / "plugin.json"
+        meta.write_text(json.dumps({**json.loads(meta.read_text()), "version": version}))
+        for rel, text in practices.items():
+            w(root / "core" / "practices" / rel, text)
+        for name, text in stages.items():
+            w(root / "core" / "stages" / name, text)
+        if changelog is not None:
+            w(root / "CHANGELOG.md", changelog)
+        return root
 
     def repo(self, name="proj"):
         r = self.tmp / name

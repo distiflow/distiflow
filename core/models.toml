@@ -1,0 +1,50 @@
+# Sub-agent roles and the model each runs on. A profile changes a role with [models.<role>].
+
+[roles.scout]
+model = "haiku"
+effort = "low"
+
+[roles.synth]
+model = "sonnet"
+effort = "medium"
+
+[roles.planner]
+model = "opus"
+effort = "high"
+
+[roles.worker]
+model = "sonnet"
+effort = "medium"
+
+[roles.gate-runner]
+model = "haiku"
+effort = "low"
+
+[roles.reviewer]
+model = "opus"
+effort = "high"
+
+# session = the model recommended for the main session; roles = sub-agents the stage uses.
+[stages.understand]
+session = "sonnet"
+roles = ["scout", "synth"]
+
+[stages.plan]
+session = "opus"
+roles = ["planner"]
+
+[stages.implement]
+session = "sonnet"
+roles = ["worker"]
+
+[stages.verify]
+session = "haiku"
+roles = ["gate-runner"]
+
+[stages.review]
+session = "opus"
+roles = ["reviewer"]
+
+[stages.ship]
+session = "haiku"
+roles = ["gate-runner"]
