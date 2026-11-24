@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, hooks, init, overlay, paths, profile, session, state, task
+from golden import brief, hooks, init, overlay, paths, profile, scan, session, state, task
 from golden.practices import STAGES
 
 
@@ -86,6 +86,17 @@ def cmd_init(args) -> int:
         print("golden: %s" % e, file=sys.stderr)
         return 1
     return 0
+
+
+def cmd_scan(args) -> int:
+    terms = scan.read_deny_file(Path(args.deny_file)) if args.deny_file else []
+    missing = [p for p in args.paths if not Path(p).exists()]
+    for p in missing:
+        print("golden: no such path %s (skipped)" % p, file=sys.stderr)
+    hits = scan.scan_paths([Path(p) for p in args.paths if p not in missing], terms)
+    for path, f in hits:
+        print("%s:%d: %s: %s" % (path, f.line, f.rule, f.match))
+    return 1 if hits else 0
 
 
 def _session(flag) -> str | None:
@@ -231,6 +242,9 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
+    sc = sub.add_parser("scan", help="scan files for leaks, project terms and hostile instructions")
+    sc.add_argument("--deny-file", help="one project term per line, # comments")
+    sc.add_argument("paths", nargs="+")
     ini = sub.add_parser("init", help="propose a project profile, or write the confirmed one from stdin")
     mode = ini.add_mutually_exclusive_group(required=True)
     mode.add_argument("--propose", action="store_true", help="print a proposal; writes nothing")
@@ -251,6 +265,8 @@ def main(argv: list[str]) -> int:
         return cmd_override(args)
     if args.cmd == "task":
         return cmd_task(args, flag)
+    if args.cmd == "scan":
+        return cmd_scan(args)
     if args.cmd == "init":
         return cmd_init(args)
     if args.cmd == "note":
