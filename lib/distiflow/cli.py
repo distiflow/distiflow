@@ -95,7 +95,10 @@ def cmd_contrib(args) -> int:
     root = paths.plugin_root()
     try:
         if args.sub == "new":
-            print(contrib.new(proj, " ".join(args.idea)), end="")
+            if bool(args.idea) == bool(args.skill):
+                print("distiflow: give an idea or --skill <dir>, not both", file=sys.stderr)
+                return 2
+            print(contrib.new(proj, " ".join(args.idea), Path(args.skill) if args.skill else None), end="")
         elif args.sub == "check":
             text, passed = contrib.check(root, proj, args.slug)
             print(text, end="")
@@ -295,8 +298,10 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
-    cb = sub.add_parser("contrib", help="send a practice upstream").add_subparsers(dest="sub", required=True)
-    cb.add_parser("new", help="start a contribution from an idea").add_argument("idea", nargs="+")
+    cb = sub.add_parser("contrib", help="send a practice or skill upstream").add_subparsers(dest="sub", required=True)
+    nw = cb.add_parser("new", help="start a contribution from an idea or a skill folder")
+    nw.add_argument("idea", nargs="*")
+    nw.add_argument("--skill", metavar="DIR", help="share this skill folder (SKILL.md only)")
     cb.add_parser("check", help="sanitize and check the draft").add_argument("slug")
     cf = cb.add_parser("confirm", help="confirm the checked draft for sending")
     cf.add_argument("slug")

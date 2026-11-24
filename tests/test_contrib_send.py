@@ -21,6 +21,8 @@ class SendCase(ContribCase):
         seed = self.tmp / "seed"
         self.git("init", "-q", "-b", "main", str(seed), cwd=self.tmp)
         shutil.copytree(self.root / "core", seed / "core")
+        if (self.root / "skills").is_dir():
+            shutil.copytree(self.root / "skills", seed / "skills")
         self.git("add", ".", cwd=seed)
         self.git("commit", "-q", "-m", "upstream", cwd=seed)
         self.git("clone", "-q", "--bare", str(seed), str(self.bare), cwd=self.tmp)

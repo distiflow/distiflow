@@ -48,6 +48,10 @@ def practice(id, stages, kinds=None, signals=None, run_cost="cheap", gate=False,
     return "\n".join(lines)
 
 
+def skill(name, description="Use when a test is needed.", body="Write the test first."):
+    return "---\nname: %s\ndescription: %s\n---\n\n%s\n" % (name, description, body)
+
+
 def write_profile(repo, committed='[project]\nname = "proj"\n[git]\npush = "forbidden"\n', local=None):
     w(Path(repo) / ".distiflow" / "profile.toml", committed)
     if local is not None:
@@ -97,7 +101,7 @@ class DistiflowCase(unittest.TestCase):
         return subprocess.run(["git", *args], cwd=cwd, env=self.env, check=True,
                               capture_output=True, text=True).stdout
 
-    def fixture_root(self, version="0.1.0", practices={}, stages={}, changelog=None):
+    def fixture_root(self, version="0.1.0", practices={}, stages={}, changelog=None, skills={}):
         root = Path(tempfile.mkdtemp(dir=self.tmp, prefix="root"))
         (root / "core").mkdir()
         for f in (REPO / "core").glob("*.toml"):
@@ -113,6 +117,8 @@ class DistiflowCase(unittest.TestCase):
             w(root / "core" / "stages" / name, text)
         if changelog is not None:
             w(root / "CHANGELOG.md", changelog)
+        for name, text in skills.items():
+            w(root / "skills" / name / "SKILL.md", text)
         return root
 
     def gh_stub(self, auth="ok", push="true", merged="", fail=""):

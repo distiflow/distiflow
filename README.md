@@ -23,6 +23,7 @@ Needs Python 3.11 or newer and git. `gh` is needed only to open change requests.
 | `/distiflow:task resume <id>` · `list` · `abandon <id>` | Continue, list or drop tasks |
 | `/distiflow:override <path>` | Make a local override of an upstream stage, practice or TOML file |
 | `/distiflow:contribute <idea>` | Send a generic practice upstream as a change request |
+| `/distiflow:contribute --skill <dir>` | Share one of your skills; once merged, every install has it as `/distiflow:<name>` |
 
 The CLI behind them is `distiflow` (`bin/distiflow`): `task`, `note`, `gate pass`, `advance`,
 `stage reopen`, `ship`, `worktree restore`, `brief`, `profile check`, `override`, `init`, `contrib`,

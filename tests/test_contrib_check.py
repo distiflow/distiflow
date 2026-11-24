@@ -10,9 +10,12 @@ NEAR = ("Before fixing, write a test that fails. Watch the test fail for the rig
 
 
 class ContribCase(DistiflowCase):
+    SKILLS = {}
+
     def setUp(self):
         super().setUp()
-        self.root = self.fixture_root(practices={"plan/%s.md" % k: practice(k, ["plan"], body=v) for k, v in CORPUS.items()})
+        self.root = self.fixture_root(practices={"plan/%s.md" % k: practice(k, ["plan"], body=v) for k, v in CORPUS.items()},
+                                      skills=self.SKILLS)
         self.proj = self.repo("zentrix-api")
         write_profile(self.proj, PROFILE)
 

@@ -23,8 +23,8 @@ never copy them in.
 
 ```
 .claude-plugin/{marketplace.json,plugin.json}
-skills/            thin launchers only — every overridable text lives in core/
-  task/  init/  contribute/  override/
+skills/            launchers (task/ init/ contribute/ override/, names reserved) and shared
+                   skills (<name>/SKILL.md only, sent with /distiflow:contribute --skill)
 agents/            scout · synth · planner · worker · gate-runner · reviewer
 core/
   stages/<stage>.md          stage instructions (understand plan implement verify review ship)
@@ -32,7 +32,7 @@ core/
   kinds.toml  signals.toml  glossary.toml  models.toml  limits.toml
 bin/distiflow      python entry
 lib/distiflow/     cli · paths · session · hooks · fsutil · overlay · profile · select · state ·
-                   claim · worktree · scan · similar · glossary · toml_write
+                   claim · worktree · scan · similar · glossary · toml_write · skills
 hooks/hooks.json   SessionStart session id · PostToolUse heartbeat · PreToolUse claim guard and Agent cap
 tests/             stdlib unittest, integration over temp git repos
 .github/workflows/check.yml   pull_request, no secrets

@@ -3,16 +3,16 @@ import os
 import tomllib
 from pathlib import Path
 
-from distiflow import fsutil, glossary, scan, similar
+from distiflow import fsutil, glossary, scan, similar, skills
 from distiflow.practices import STAGES, Malformed, kinds, parse_practice
 from distiflow.worktree import git
 
 
-def _limit(core: Path) -> int:
+def _limit(core: Path, kind: str = "practice", default: int = 1500) -> int:
     try:
-        return tomllib.loads((core / "limits.toml").read_text(encoding="utf-8"))["practice"]["max_tokens"]
+        return tomllib.loads((core / "limits.toml").read_text(encoding="utf-8"))[kind]["max_tokens"]
     except (OSError, ValueError, KeyError):
-        return 1500
+        return default
 
 
 def _md(base: Path) -> list[Path]:
@@ -41,6 +41,21 @@ def _hostile(files: list[Path], rel, errs: list) -> None:
         errs += ["%s:%d: %s: %s" % (rel(f), x.line, x.rule, x.match) for x in scan.scan_hostile(f.read_text(encoding="utf-8"))]
 
 
+def _skills(root: Path, limit: int, errs: list) -> list[Path]:
+    """Shared skills: SKILL.md present, frontmatter valid, name = folder, size, hostile text."""
+    files = []
+    for name, f in skills.shared(root).items():
+        rel = f.relative_to(root).as_posix()
+        if not f.is_file():
+            errs.append("%s: missing" % rel)
+            continue
+        text = f.read_text(encoding="utf-8")
+        errs += ["%s: %s" % (rel, p) for p in skills.problems(text, name, limit)]
+        files.append(f)
+    _hostile(files, lambda f: f.relative_to(root).as_posix(), errs)
+    return files
+
+
 def _known_kinds(root: Path) -> tuple:
     try:
         return kinds(root)
@@ -59,6 +74,7 @@ def check_core(root: Path) -> tuple[list[str], list]:
             errs.append("%s: invalid TOML: %s" % (rel(f), e))
     practices = _practices(_md(core / "practices"), rel, _known_kinds(root), _limit(core), errs)
     _hostile(_md(core), rel, errs)
+    _skills(root, _limit(core, "skill", 5000), errs)
     return errs, practices
 
 
@@ -82,7 +98,8 @@ def check_ci(root: Path, base: str | None) -> tuple[list[str], list[str], str]:
         terms = tomllib.loads((root / "core" / "glossary.toml").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         terms = {}
-    for f in _md(root / "core"):
+    shared = [f for f in skills.shared(root).values() if f.is_file()]
+    for f in _md(root / "core") + shared:
         text = f.read_text(encoding="utf-8")
         errs += ["%s:%d: %s: %s" % (rel(f), x.line, x.rule, x.match) for x in scan.scan_leaks(text, [])]
         errs += ['%s:%d: alias "%s": use "%s"' % (rel(f), n, a, t) for a, t, n in glossary.alias_hits(text, terms)]

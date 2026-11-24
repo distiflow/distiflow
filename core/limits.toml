@@ -18,6 +18,9 @@ ship = 2000
 [practice]
 max_tokens = 1500
 
+[skill]
+max_tokens = 5000
+
 [contribute]
 shortlist = 5
 similar_threshold = 0.6
