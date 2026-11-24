@@ -8,7 +8,11 @@ Review the whole change with fresh eyes, against the agreed behaviour and the pr
 4. Check each defect class against the diff: error handling that loses data, a missing check at a
    trust boundary, state shared across concurrent work, a resource that is opened and never closed,
    a query or loop that grows with the data, a test that would pass with the bug present.
-5. Grade each finding by what a person using the software gets if it ships. Fix the serious ones in
+5. For a change to the UI, look at each changed screen in the running app: layout, states, focus.
+   Browser, in this order: 1) Claude in Chrome (`mcp__claude-in-chrome__*`): cheaper and faster,
+   it reads only what you ask for. 2) Playwright MCP, only when the Chrome extension is not
+   connected; say so first.
+6. Grade each finding by what a person using the software gets if it ships. Fix the serious ones in
    the implement stage (`distiflow stage reopen <id> implement`); record the rest.
 
 ### Roles
