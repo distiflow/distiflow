@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, hooks, init, overlay, paths, profile, scan, session, state, task
+from golden import brief, check, hooks, init, overlay, paths, profile, scan, session, state, task
 from golden.practices import STAGES
 
 
@@ -86,6 +86,29 @@ def cmd_init(args) -> int:
         print("golden: %s" % e, file=sys.stderr)
         return 1
     return 0
+
+
+def cmd_check(args) -> int:
+    root, warns, report = paths.plugin_root(), [], ""
+    if args.release:
+        errs = check.check_release(root, args.release)
+    elif args.local:
+        proj = _project()
+        if proj is None:
+            return 3
+        errs = check.check_local(root, proj)
+    elif args.ci:
+        errs, warns, report = check.check_ci(root, args.base)
+    else:
+        errs = check.check_core(root)[0]
+    for line in errs + warns:
+        print(line)
+    if report:
+        print(report, end="")
+        check.summary(report)
+    if not errs:
+        print("check ok")
+    return 1 if errs else 0
 
 
 def cmd_scan(args) -> int:
@@ -242,6 +265,12 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
+    ck = sub.add_parser("check", help="check upstream content (default), for CI, a project's own files, or a release")
+    ckm = ck.add_mutually_exclusive_group()
+    ckm.add_argument("--ci", action="store_true", help="also leaks, glossary aliases, unknown terms, similarity")
+    ckm.add_argument("--local", action="store_true", help="format checks over .golden/overrides and .golden/practices")
+    ckm.add_argument("--release", metavar="TAG", help="tag must match plugin.json, marketplace.json and CHANGELOG.md")
+    ck.add_argument("--base", help="similarity report covers practices changed since this ref")
     sc = sub.add_parser("scan", help="scan files for leaks, project terms and hostile instructions")
     sc.add_argument("--deny-file", help="one project term per line, # comments")
     sc.add_argument("paths", nargs="+")
@@ -265,6 +294,8 @@ def main(argv: list[str]) -> int:
         return cmd_override(args)
     if args.cmd == "task":
         return cmd_task(args, flag)
+    if args.cmd == "check":
+        return cmd_check(args)
     if args.cmd == "scan":
         return cmd_scan(args)
     if args.cmd == "init":
