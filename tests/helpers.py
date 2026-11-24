@@ -102,6 +102,8 @@ class GoldenCase(unittest.TestCase):
         (root / "core").mkdir()
         for f in (REPO / "core").glob("*.toml"):
             shutil.copy(f, root / "core" / f.name)
+        if (REPO / "core" / "stages").is_dir():
+            shutil.copytree(REPO / "core" / "stages", root / "core" / "stages")
         shutil.copytree(REPO / ".claude-plugin", root / ".claude-plugin")
         meta = root / ".claude-plugin" / "plugin.json"
         meta.write_text(json.dumps({**json.loads(meta.read_text()), "version": version}))

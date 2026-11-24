@@ -2,7 +2,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import hooks, overlay, paths, profile, session
+from golden import brief, hooks, overlay, paths, profile, session
+from golden.practices import STAGES
 
 
 def _project() -> Path | None:
@@ -12,20 +13,13 @@ def _project() -> Path | None:
     return proj
 
 
-def load_profile_for(root: Path, project: Path):
-    practices, _ = overlay.load_practices(root, project)
-    upstream, _ = overlay.load_practices(root, None)
-    models, _ = overlay.load_toml("models.toml", root, project)
-    return profile.load_profile(project, practices, roles=tuple(models.get("roles", {})),
-                                upstream_gates=frozenset(p.id for p in upstream if p.gate))
-
-
 def cmd_profile_check(args) -> int:
     proj = _project()
     if proj is None:
         return 3
     try:
-        _, warnings = load_profile_for(paths.plugin_root(), proj)
+        root = paths.plugin_root()
+        _, warnings = profile.load_for(root, proj, overlay.load_practices(root, proj)[0])
     except profile.ProfileError as e:
         for line in e.errors:
             print(line, file=sys.stderr)
@@ -57,6 +51,23 @@ def cmd_override(args) -> int:
     return 0
 
 
+def cmd_brief(args) -> int:
+    proj = _project()
+    if proj is None:
+        return 3
+    try:
+        text, _ = brief.build_brief(paths.plugin_root(), proj, args.stage, args.kind)
+    except profile.ProfileError as e:
+        for line in e.errors:
+            print(line, file=sys.stderr)
+        return 1
+    except brief.UnknownKind as e:
+        print("golden: %s" % e, file=sys.stderr)
+        return 2
+    print(text, end="")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     argv, flag = session.extract_session_flag(argv)
     parser = argparse.ArgumentParser(prog="golden")
@@ -66,12 +77,17 @@ def main(argv: list[str]) -> int:
     hook.add_argument("name")
     prof = sub.add_parser("profile", help="profile commands").add_subparsers(dest="sub", required=True)
     prof.add_parser("check", help="validate .golden/profile.toml and profile.local.toml")
+    br = sub.add_parser("brief", help="print the brief for one stage")
+    br.add_argument("--stage", required=True, choices=STAGES)
+    br.add_argument("--kind", required=True)
     ovr = sub.add_parser("override", help="copy an upstream file to .golden/overrides, or: override list")
     ovr.add_argument("target", help="path under core/, or 'list'")
     args = parser.parse_args(argv)
 
     if args.cmd == "profile":
         return cmd_profile_check(args)
+    if args.cmd == "brief":
+        return cmd_brief(args)
     if args.cmd == "override":
         return cmd_override(args)
     if args.cmd == "hook":

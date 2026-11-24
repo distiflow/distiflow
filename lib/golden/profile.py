@@ -147,3 +147,12 @@ def load_profile(project: Path, practices: list[Practice], roles=(), upstream_ga
 
 def gate_disables(profile: dict) -> dict[str, str]:
     return {d["id"]: d["reason"].strip() for d in _disables(profile, "gates")}
+
+
+def load_for(root: Path, project: Path, practices: list[Practice]) -> tuple[dict, list[str]]:
+    """load_profile with the roles and upstream gates read from the plugin root."""
+    from golden import overlay
+    upstream, _ = overlay.load_practices(root, None)
+    models, _ = overlay.load_toml("models.toml", root, project)
+    return load_profile(project, practices, roles=tuple(models.get("roles", {})),
+                        upstream_gates=frozenset(p.id for p in upstream if p.gate))
