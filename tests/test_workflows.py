@@ -24,12 +24,13 @@ class Workflows(unittest.TestCase):
                     self.assertNotIn("write", block)
                 self.assertNotRegex(text, r"permissions:\s*write")
 
-    def test_release_and_guard_jobs(self):
-        """T26 T28 S57: release runs the release check; CI keeps the Python 3.10 guard job."""
+    def test_release_and_single_python(self):
+        """T26 T28 S57 DF-1: release runs the release check; CI runs on one Python, the 3.11 floor.
+        The 3.10 version gate is covered by tests/test_entry.py, not by a CI job."""
         texts = self.texts()
         self.assertIn("check --release", texts["release.yml"])
-        self.assertIn('"3.10"', texts["check.yml"])
-        guard = texts["check.yml"].split("py310-guard:", 1)[1].split("\n  gitleaks:", 1)[0]
-        self.assertIn("needs Python 3.11", guard)  # exit 3 alone also comes from "no session id"
-        self.assertNotIn("|| test", guard)
         self.assertIn("check --ci --base", texts["check.yml"])
+        for name, text in texts.items():
+            with self.subTest(file=name):
+                self.assertNotIn("matrix:", text)
+                self.assertEqual(set(re.findall(r'python-version: "([^"]+)"', text)), {"3.11"})
