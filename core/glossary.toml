@@ -1,0 +1,57 @@
+# Preferred words for upstream text. CI flags an alias and names the preferred term.
+
+[terms."task"]
+definition = "One unit of work moving through the stages, with its own state and claim."
+aliases = []
+
+[terms."stage"]
+definition = "One step of a task: understand, plan, implement, verify, review, ship."
+aliases = ["phase step"]
+
+[terms."practice"]
+definition = "A short rule loaded into a stage when its tags match the task."
+aliases = []
+
+[terms."gate"]
+definition = "A practice that must have recorded evidence before the stage can advance."
+aliases = ["checkpoint gate"]
+
+[terms."evidence"]
+definition = "What shows a gate passed: command output, a link, a short note."
+aliases = []
+
+[terms."brief"]
+definition = "The text a stage starts from: stage instructions, loaded practices, gates and models."
+aliases = []
+
+[terms."profile"]
+definition = "The project's committed settings in .golden/profile.toml, plus an optional personal layer."
+aliases = []
+
+[terms."override"]
+definition = "A project copy of an upstream file that replaces it and records the upstream hash."
+aliases = []
+
+[terms."kind"]
+definition = "The sort of task: feature, fix, debug, perf or ux."
+aliases = ["task type"]
+
+[terms."signal"]
+definition = "A fact about the project found from its files, such as has-tests."
+aliases = []
+
+[terms."run cost"]
+definition = "How much a practice costs to follow: cheap, medium or expensive."
+aliases = []
+
+[terms."working copy"]
+definition = "The checkout a task's code changes are made in."
+aliases = ["worktree checkout"]
+
+[terms."change request"]
+definition = "A proposed change to a shared branch, reviewed before merge."
+aliases = ["pull request", "PR", "merge request", "MR"]
+
+[terms."contribution"]
+definition = "A practice sent upstream through the contribute flow."
+aliases = []
