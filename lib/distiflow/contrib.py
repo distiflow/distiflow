@@ -7,7 +7,7 @@ import shutil
 import tomllib
 from pathlib import Path
 
-from distiflow import fsutil, glossary, names, overlay, profile, scan, similar, worktree
+from distiflow import fsutil, glossary, names, overlay, profile, scan, similar, skills, worktree
 from distiflow.practices import _check, kinds, split_frontmatter
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
@@ -34,14 +34,37 @@ def folder(project: Path, slug: str, must_exist: bool = True) -> Path:
     return d
 
 
-def new(project: Path, idea: str) -> str:
+def new(project: Path, idea: str, skill: Path | None = None) -> str:
+    text = None
+    if skill is not None:
+        src = skill / "SKILL.md"
+        if not src.is_file():
+            raise ContribError("no SKILL.md in %s" % skill)
+        # shortcut: SKILL.md only, since scripts in a shared skill run for every installer; widen when a skill needs files.
+        extra = sorted(f.relative_to(skill).as_posix() for f in skill.rglob("*")
+                       if f.is_file() and f != src and f.name != ".DS_Store")
+        if extra:
+            raise ContribError("shared skills hold only SKILL.md; remove or inline: %s" % ", ".join(extra))
+        text = src.read_text(encoding="utf-8")
+        try:
+            idea = skills.parse(text)["name"]
+        except ValueError as e:
+            raise ContribError("%s: %s" % (src, e)) from None
     slug = names.slug(idea)
     d = folder(project, slug, must_exist=False)
     if d.is_dir():
         return "draft exists: %s; continue it or distiflow contrib discard %s --confirm\n" % (d, slug)
     d.mkdir(parents=True)
     fsutil.atomic_write(d / "idea.txt", idea + "\n")
-    return "write the practice draft to %s, then run distiflow contrib check %s\n" % (d / "draft.md", slug)
+    if text is None:
+        return "write the practice draft to %s, then run distiflow contrib check %s\n" % (d / "draft.md", slug)
+    fsutil.atomic_write(d / "kind", "skill\n")
+    fsutil.atomic_write(d / "draft.md", text)
+    return "skill copied to %s; edit it if needed, then run distiflow contrib check %s\n" % (d / "draft.md", slug)
+
+
+def _is_skill(d: Path) -> bool:
+    return (d / "kind").is_file() and (d / "kind").read_text(encoding="utf-8").strip() == "skill"
 
 
 def upstream_practices(root: Path) -> dict[str, Path]:
@@ -52,18 +75,29 @@ def _limits(root: Path, project: Path) -> dict:
     return overlay.load_toml("limits.toml", root, project)[0]
 
 
-def _checks(text: str, root: Path, project: Path, prof: dict) -> tuple[dict, dict]:
+def _checks(text: str, root: Path, project: Path, prof: dict, skill: bool = False) -> tuple[dict, dict]:
     """Every check runs and reports, also after an earlier one failed (S49)."""
     results, meta = {}, {}
-    try:
-        front, _ = split_frontmatter(text)
-        meta = tomllib.loads(front)
-        _check(meta, Path("%s.md" % meta.get("id", "")), kinds(root))
-        results["format"] = ""
-    except (ValueError, tomllib.TOMLDecodeError) as e:
-        results["format"] = str(e)
-    tokens, limit = math.ceil(len(text) / 4), _limits(root, project)["practice"]["max_tokens"]
-    results["size"] = "" if tokens <= limit else "size %d > limit %d" % (tokens, limit)
+    if skill:
+        limit = _limits(root, project).get("skill", {}).get("max_tokens", 5000)
+        found = skills.problems(text, None, limit)
+        results["format"] = "; ".join(p for p in found if not p.startswith("size "))
+        results["size"] = "; ".join(p for p in found if p.startswith("size "))
+        try:
+            meta = skills.parse(text)
+            meta["id"] = meta["name"]
+        except ValueError:
+            pass
+    else:
+        try:
+            front, _ = split_frontmatter(text)
+            meta = tomllib.loads(front)
+            _check(meta, Path("%s.md" % meta.get("id", "")), kinds(root))
+            results["format"] = ""
+        except (ValueError, tomllib.TOMLDecodeError) as e:
+            results["format"] = str(e)
+        tokens, limit = math.ceil(len(text) / 4), _limits(root, project)["practice"]["max_tokens"]
+        results["size"] = "" if tokens <= limit else "size %d > limit %d" % (tokens, limit)
     leaks = scan.scan_leaks(text, scan.deny_terms_for(prof, project))
     results["leaks"] = "; ".join("line %d %s: %s" % (f.line, f.rule, f.match) for f in leaks)
     hostile = scan.scan_hostile(text)
@@ -84,21 +118,25 @@ def check(root: Path, project: Path, slug: str) -> tuple[str, bool]:
     prof = profile.load_for(root, project, overlay.load_practices(root, project)[0])[0]
     text, replaced = glossary.rewrite(draft, prof.get("glossary", {}))
     fsutil.atomic_write(d / "sanitized.md", text)
-    results, meta = _checks(text, root, project, prof)
+    skill = _is_skill(d)
+    results, meta = _checks(text, root, project, prof, skill)
     passed = not any(results.values())
     cls = ["%s: %s" % (k, ", ".join(meta[k]) if isinstance(meta.get(k), list) else meta.get(k, "-"))
-           for k in ("stages", "kinds", "signals", "run_cost", "gate")]
+           for k in (("name", "description") if skill else ("stages", "kinds", "signals", "run_cost", "gate"))]
     diff = difflib.unified_diff((d / "original.md").read_text(encoding="utf-8").splitlines(), text.splitlines(),
                                 "original.md", "sanitized.md", lineterm="")
-    corpus = {pid: p.read_text(encoding="utf-8") for pid, p in upstream_practices(root).items()}
+    upstream = skills.shared(root) if skill else upstream_practices(root)
+    corpus = {pid: p.read_text(encoding="utf-8") for pid, p in upstream.items() if p.is_file()}
     top = similar.shortlist(text, corpus, _limits(root, project)["contribute"]["shortlist"])
     out = ["## Classification", *cls,
            "## Checks", *("%s: %s" % (c, "pass" if not results[c] else "FAIL " + results[c]) for c in CHECKS),
            "## Replaced terms", *(["%s → %s ×%d" % r for r in replaced] or ["- none"]),
            "## Diff", *(list(diff) or ["- no changes"]),
-           "## Similar upstream practices", *(["%s %.3f" % s for s in top] or ["- none"])]
+           "## Similar upstream %s" % ("skills" if skill else "practices"),
+           *(["%s %.3f" % s for s in top] or ["- none"])]
     fsutil.atomic_write(d / "check.json", json.dumps({"passed": passed, "sha256": sha256(d / "sanitized.md"),
-                                                      "id": meta.get("id"), "stages": meta.get("stages")}))
+                                                      "id": meta.get("id"), "stages": meta.get("stages"),
+                                                      "skill": skill}))
     return "\n".join(out) + "\n", passed
 
 
@@ -115,7 +153,17 @@ def confirm(root: Path, project: Path, slug: str, verdict: str) -> str:
     kind, _, pid = verdict.partition(":")
     if kind == "duplicate":
         raise ContribError("duplicate of %s; nothing to send" % pid)
-    if kind == "new" and not pid:
+    shared = skills.shared(root)
+    if chk.get("skill") and kind == "new" and not pid:
+        if chk["id"] in shared:
+            raise ContribError("skill %s already exists upstream; confirm with --verdict extends:%s"
+                               % (chk["id"], chk["id"]))
+        target = "skills/%s/SKILL.md" % chk["id"]
+    elif chk.get("skill") and kind == "extends" and pid in shared:
+        target = "skills/%s/SKILL.md" % pid
+    elif chk.get("skill"):
+        raise ContribError("verdict must be new, extends:<upstream skill> or duplicate:<skill> (got %s)" % verdict)
+    elif kind == "new" and not pid:
         target = "core/practices/%s/%s.md" % (chk["stages"][0], chk["id"])
     elif kind == "extends" and pid in upstream_practices(root):
         target = upstream_practices(root)[pid].relative_to(root).as_posix()
@@ -141,14 +189,14 @@ def _upstream(root: Path) -> tuple[str, str]:
     return url, "%s/%s" % m.groups()
 
 
-def _similar_open(wc: Path, branch: str, text: str, threshold: float) -> tuple[str, float] | None:
+def _similar_open(wc: Path, branch: str, text: str, threshold: float, area: str) -> tuple[str, float] | None:
     refs = worktree.git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/contrib/", cwd=wc).stdout.split()
     best = None
     for ref in refs:
         other = ref[len("origin/"):]
         if other == branch:
             continue
-        files = worktree.git("diff", "--name-only", "origin/main..." + ref, "--", "core/practices", cwd=wc).stdout.split()
+        files = worktree.git("diff", "--name-only", "origin/main..." + ref, "--", area, cwd=wc).stdout.split()
         corpus = {f: worktree.git("show", "%s:%s" % (ref, f), cwd=wc).stdout for f in files}
         top = similar.shortlist(text, corpus, k=1)
         if top and top[0][1] >= threshold and (best is None or top[0][1] > best[1]):
@@ -187,14 +235,17 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
                                "distiflow contrib send %s" % slug, 3)
     url, repo = _upstream(root)
     wc = Path.home() / ".distiflow" / "upstream"
-    target, pid = conf["target"], Path(conf["target"]).stem
-    msg = ("feat(practices): add %s" if conf["verdict"] == "new" else "docs(practices): extend %s") % pid
+    target = conf["target"]
+    area = "skills" if target.startswith("skills/") else "core/practices"
+    pid = Path(target).parent.name if area == "skills" else Path(target).stem
+    noun = "skills" if area == "skills" else "practices"
+    msg = ("feat(%s): add %s" if conf["verdict"] == "new" else "docs(%s): extend %s") % (noun, pid)
     # --update is user input that reaches git: only an existing contribution branch name is accepted.
     if update is not None and not (update.startswith("contrib/") and SLUG.fullmatch(update[len("contrib/"):])):
         raise ContribError("not a contribution branch: %r (expected contrib/<slug>)" % update, 2)
     # The branch is public: name it from the checked practice id, never from the raw idea text.
     if not SLUG.fullmatch(pid):
-        raise ContribError("practice id %r cannot name a branch; use lower-case words and hyphens" % pid)
+        raise ContribError("id %r cannot name a branch; use lower-case words and hyphens" % pid)
     branch = update or "contrib/%s" % pid
     try:
         if not (wc / ".git").is_dir():
@@ -213,7 +264,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
         worktree.must("checkout", "-q", "-B", branch, start, cwd=wc)
         if not update and not force_new:
             limit = _limits(root, project)["contribute"]["similar_threshold"]
-            near = _similar_open(wc, branch, text, limit)
+            near = _similar_open(wc, branch, text, limit, area)
             if near:
                 raise ContribError("similar open contribution %s (%.3f): rerun with --update %s or --new"
                                    % (near[0], near[1], near[0]), 2)
@@ -235,7 +286,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
             if not issue:
                 raise ContribError("no write access to %s: rerun with --issue to open an issue with the same "
                                    "content" % repo, 2)
-            r = worktree.gh("issue", "create", "--repo", repo, "--title", "Practice idea: %s" % pid,
+            r = worktree.gh("issue", "create", "--repo", repo, "--title", "%s idea: %s" % ("Skill" if area == "skills" else "Practice", pid),
                             "--body-file", str(d / "sanitized.md"), cwd=wc)
             if r.returncode != 0:
                 raise ContribError("gh issue create failed; rerun distiflow contrib send %s --issue" % slug)
