@@ -1,0 +1,18 @@
+{
+  "name": "golden-workflow",
+  "description": "The golden plugin: a staged, practice-driven task workflow for Claude Code.",
+  "owner": {
+    "name": "Bogdan Kravchuk"
+  },
+  "plugins": [
+    {
+      "name": "golden",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Six-stage task pipeline with tag-selected practices and layered project overrides.",
+      "author": {
+        "name": "Bogdan Kravchuk"
+      }
+    }
+  ]
+}

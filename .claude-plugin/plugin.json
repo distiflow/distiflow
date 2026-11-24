@@ -1,0 +1,10 @@
+{
+  "name": "golden",
+  "version": "0.1.0",
+  "description": "Six-stage task pipeline with tag-selected practices, layered project overrides, resumable task state and a sanitizing contribute flow.",
+  "author": {
+    "name": "Bogdan Kravchuk"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/<owner>/golden-workflow"
+}
