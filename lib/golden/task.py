@@ -236,7 +236,7 @@ def advance(root: Path, project: Path, session: str, task_id: str) -> str:
                 note = worktree.enter_implement(project, st, _git_conf(root, project), session)
             except (worktree.GitError, ValueError) as e:
                 raise TaskError(str(e)) from None
-        out.append(_open_run(root, project, st, nxt, session, carry=False) + note)
+        out.append(_open_run(root, project, st, nxt, session, carry=True) + note)
 
     _mutate(task_dir(project, task_id), session, apply)
     return out[0] + "\nstart a fresh session: /golden:task resume %s\n" % task_id
@@ -278,15 +278,16 @@ def ship(root: Path, project: Path, session: str, task_id: str, merged: bool) ->
     conf, branch = _git_conf(root, project), st["branch"]
     wc = Path(st["worktree"]) if st["worktree"] else project
     try:
-        if not worktree.is_merged(project, branch, conf["base"], merged):
-            dirty = worktree.porcelain(wc)
-            if dirty:
-                raise TaskError("uncommitted changes in %s; commit them before ship:\n%s" % (wc, dirty))
+        # Uncommitted work blocks every path: an empty branch must not ship as done with work left behind.
+        dirty = worktree.porcelain(wc)
+        if dirty:
+            raise TaskError("uncommitted changes in %s; commit them before ship:\n%s" % (wc, dirty))
+        if not (st["status"] == "cleanup-pending" or worktree.is_merged(project, branch, conf["base"], merged)):
             handoff = ("git push -u origin %s\ngh pr create --head %s --base %s\n" % (branch, branch, conf["base"]))
             if conf["push"] == "forbidden":
                 _set_status(d, session, "awaiting-merge")
                 return "this project does not let golden push; hand off with:\n" + handoff
-            url = worktree.push_and_request(project, wc, branch, conf["base"])
+            url = worktree.push_and_request(project, branch, conf["base"])
             _set_status(d, session, "awaiting-merge")
             if url is None:
                 raise TaskError("branch pushed; gh is missing or signed out. Open the request with:\n" + handoff, 3)

@@ -15,7 +15,7 @@ SCHEMA = {
     "gates": {"disable": _DISABLE},
     "models": {"*role": {"model": str, "effort": EFFORTS}},
     "cost": {"run_cap": RUN_COSTS, "budget": {"*stage": "posint"}},
-    "git": {"worktrees": bool, "push": ("allowed", "forbidden"), "base": str, "branch": str},
+    "git": {"worktrees": bool, "push": ("allowed", "forbidden"), "base": "ref", "branch": str},
 }
 GIT_DEFAULTS = {"worktrees": True, "push": "allowed", "base": "main", "branch": "{type}/{slug}_{id}"}
 _TYPE_NAMES = {str: "string", bool: "boolean"}
@@ -32,6 +32,10 @@ def _validate(value, spec, dotted: str, errs: list, roles) -> None:
     if spec == "posint":
         if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
             errs.append("%s: expected integer > 0" % dotted)
+    elif spec == "ref":
+        # Reaches git as an argument: never an option, never whitespace.
+        if not isinstance(value, str) or not value or value.startswith("-") or any(c.isspace() for c in value):
+            errs.append("%s: expected a branch name" % dotted)
     elif isinstance(spec, tuple):
         if value not in spec:
             errs.append("%s: expected one of %s" % (dotted, ", ".join(spec)))

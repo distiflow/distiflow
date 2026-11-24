@@ -32,6 +32,17 @@ class PushAllowed(WorktreeCase):
         self.ok("ship", tid)
         self.assertEqual([p["head"] for p in self.gh_state()["prs"]], [branch])
 
+    def test_push_with_deleted_worktree(self):
+        """T4 S38: a deleted working copy does not break the push; the branch is pushed from the main checkout."""
+        tid = self.start()
+        self.advance_to(tid, "ship")
+        branch = self.st(tid)["branch"]
+        self.commit_in(self.wt(tid))
+        __import__("shutil").rmtree(self.wt(tid))
+        r = self.g("ship", tid)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(branch, self.git("ls-remote", "--heads", str(self.bare), branch, cwd=self.tmp))
+
     def test_dirty_copy_blocks_push(self):
         """T4: uncommitted work stops ship before anything is pushed."""
         tid = self.start()
@@ -42,3 +53,4 @@ class PushAllowed(WorktreeCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("?? dirty.txt", r.stderr)
         self.assertEqual(self.gh_state()["prs"], [])
+        self.assertEqual(self.git("ls-remote", "--heads", str(self.bare), cwd=self.tmp).count("refs/heads/"), 1)

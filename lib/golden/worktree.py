@@ -81,7 +81,9 @@ def enter_implement(project: Path, st: dict, git_conf: dict, session: str) -> st
         if other != st["id"]:
             raise GitError("the checkout is in use by task %s" % (other or "unknown (unreadable checkout.claim)"))
     try:
-        must(*(("switch", branch) if _branch_exists(project, branch) else ("switch", "-c", branch)), cwd=project)
+        # A new branch starts at base, never at whatever the shared checkout has on it.
+        start = _remote_or_local(project, git_conf["base"])
+        must(*(("switch", branch) if _branch_exists(project, branch) else ("switch", "-c", branch, start)), cwd=project)
     except GitError:
         if created:
             checkout_claim(project).unlink(missing_ok=True)
@@ -95,12 +97,14 @@ def is_merged(project: Path, branch: str, base: str, confirmed: bool) -> bool:
     if r is not None and r.returncode == 0 and r.stdout.strip() == "MERGED":
         return True
     git("fetch", "-q", "origin", base, cwd=project)  # offline or no remote: fall back to the local base
-    target = "origin/" + base
-    if git("rev-parse", "--verify", "--quiet", target, cwd=project).returncode != 0:
-        target = base
-    if git("merge-base", "--is-ancestor", branch, target, cwd=project).returncode == 0:
+    if git("merge-base", "--is-ancestor", branch, _remote_or_local(project, base), cwd=project).returncode == 0:
         return True
     return confirmed
+
+
+def _remote_or_local(project: Path, base: str) -> str:
+    remote = "origin/" + base
+    return remote if git("rev-parse", "--verify", "--quiet", remote, cwd=project).returncode == 0 else base
 
 
 def porcelain(path: Path) -> str:
@@ -119,9 +123,9 @@ def restore(project: Path, path: Path, branch: str) -> None:
     must("worktree", "add", "--", str(path), branch, cwd=project)
 
 
-def push_and_request(project: Path, wc: Path, branch: str, base: str) -> str | None:
+def push_and_request(project: Path, branch: str, base: str) -> str | None:
     """Push the branch and return the request URL; None when gh is missing or signed out."""
-    must("push", "-q", "-u", "origin", branch, cwd=wc)
+    must("push", "-q", "-u", "origin", branch, cwd=project)  # refs are shared: works with the worktree gone
     r = gh("pr", "list", "--head", branch, "--json", "url", "-q", ".[0].url", cwd=project)
     if r is None or r.returncode != 0:
         return None

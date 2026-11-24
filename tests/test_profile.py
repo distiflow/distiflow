@@ -9,6 +9,7 @@ T16_ROWS = [  # S6 R51
     ("bad role", '[models.wizard]\nmodel = "opus"\n', None, 1, "models.wizard: unknown role"),
     ("bad effort", '[models.scout]\neffort = "huge"\n', None, 1, "models.scout.effort: expected one of"),
     ("bad budget", '[cost.budget]\nplan = 0\n', None, 1, "cost.budget.plan: expected integer > 0"),
+    ("option base", '[git]\nbase = "--upload-pack=touch pwned"\n', None, 1, "git.base: expected a branch name"),
     ("bad toml", '[git\n', None, 1, "profile.toml: invalid TOML"),
     ("local typo", '', '[cost]\nrun_capp = "cheap"\n', 1, "profile.local.toml: cost.run_capp: unknown key"),
     ("unknown disable id", '[[practices.disable]]\nid = "zz"\n', None, 0, "practices.disable: zz: unknown practice"),

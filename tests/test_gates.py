@@ -20,6 +20,8 @@ ROWS = [
      "failing gate: g-under"),
     ("reopen sets the stage", ["pass g-under ok", "advance", "pass g-plan p", "reopen understand", "advance"], 0,
      "stage 2/6 plan"),
+    ("re-entry by advance carries", ["pass g-under ok", "advance", "pass g-plan p", "reopen understand", "advance",
+                                     "show"], 0, "g-plan: p (carried from run 1)"),
     ("snapshot not live", ["<add gate g-new>", "pass g-under ok", "advance"], 0, "stage 2/6 plan"),
     ("non-holder cannot pass", ["<as s-2> pass g-under ok"], 1, "you do not hold task"),
     ("new run belongs to the advancer", ["pass g-under ok", "advance", "<release>", "<as s-2> resume"], 0,

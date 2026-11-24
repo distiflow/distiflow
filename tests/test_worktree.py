@@ -150,6 +150,21 @@ class Worktree(WorktreeCase):
         self.ok("ship", tid)
         self.assertEqual((self.st(tid)["status"], self.wt(tid).exists()), ("done", False))
 
+    def test_cleanup_pending_remembers_merge(self):
+        """T10 S18 I12: a confirmed merge stays confirmed when cleanup is retried and gh no longer sees it."""
+        tid = self.start()
+        self.advance_to(tid, "implement")
+        self.ok("gate", "pass", tid, "g-impl", "--evidence", "ok")
+        self.advance_to(tid, "ship")
+        self.commit_in(self.wt(tid))
+        self.env["GH_STUB_MERGED"] = self.st(tid)["branch"]
+        self.git("worktree", "lock", str(self.wt(tid)), cwd=self.proj)
+        self.assertEqual(self.g("ship", tid).returncode, 1)
+        self.env["GH_STUB_MERGED"] = ""
+        self.git("worktree", "unlock", str(self.wt(tid)), cwd=self.proj)
+        self.ok("ship", tid)
+        self.assertEqual((self.st(tid)["status"], self.wt(tid).exists()), ("done", False))
+
     def test_deleted_worktree_detected_and_restored(self):
         """T10 S38: resume warns about a deleted working copy; restore brings it back from the branch."""
         tid = self.start()

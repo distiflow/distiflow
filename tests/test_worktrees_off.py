@@ -45,6 +45,25 @@ class WorktreesOff(WorktreeCase):
         self.assertEqual(self.st(a)["status"], "done")
         self.assertEqual(self.advance_to(b, "implement", session="s-2").returncode, 0)
 
+    def test_task_branch_starts_at_base(self):
+        """T11 R5: a task branch starts at base, not at whatever the shared checkout has on it."""
+        self.git("switch", "-q", "-c", "other", cwd=self.proj)
+        self.commit_in(self.proj, "other.txt")
+        tid = self.start()
+        self.assertEqual(self.advance_to(tid, "implement").returncode, 0)
+        self.assertEqual(self.head(self.proj), self.git("rev-parse", "main", cwd=self.proj).strip())
+
+    def test_dirty_checkout_never_ships_as_done(self):
+        """T10 I15 R5: uncommitted work stops ship even when the branch has no commits of its own."""
+        tid = self.start()
+        self.advance_to(tid, "ship")
+        (self.proj / "work.txt").write_text("unsaved")
+        r = self.g("ship", tid)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("?? work.txt", r.stderr)
+        self.assertEqual(self.st(tid)["status"], "active")
+        self.assertTrue((self.proj / ".golden/tasks/checkout.claim").exists())
+
     def test_parallel_enter_one_wins(self):
         """T11 R22: two tasks entering implement at once, exactly one gets the checkout."""
         ids = [self.start("t%d" % i, session="s-%d" % i) for i in range(2)]
