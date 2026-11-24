@@ -5,7 +5,7 @@ from tests.test_claim import ClaimCase
 
 class Notes(ClaimCase):
     def g(self, *args, session="s-1"):
-        return self.golden(*args, cwd=self.proj, root=self.root, session=session)
+        return self.distiflow(*args, cwd=self.proj, root=self.root, session=session)
 
     def pass_gate(self, task, gate, text):
         # Gate pass lands with the gate commands; until then evidence is written the way state stores it.
@@ -40,7 +40,7 @@ class Notes(ClaimCase):
         self.assertNotIn("check mobile", r.stdout)
         self.assertIn("last passed gate: g (repro: test_login fails)", r.stdout)
         self.assertIn("pending gates: none", r.stdout)
-        self.assertIn("brief: .golden/tasks/%s/stage-1-brief.md" % task.name, r.stdout)
+        self.assertIn("brief: .distiflow/tasks/%s/stage-1-brief.md" % task.name, r.stdout)
 
     def test_interrupted_and_no_unearned_pass(self):
         """S37: a stage left open by another session shows interrupted, and no gate passes unearned."""

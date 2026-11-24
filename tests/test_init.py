@@ -1,11 +1,11 @@
 import json
 import tomllib
 
-from golden import toml_write
-from tests.helpers import GoldenCase, w, write_profile
+from distiflow import toml_write
+from tests.helpers import DistiflowCase, w, write_profile
 
 
-class Init(GoldenCase):
+class Init(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root()
@@ -17,7 +17,7 @@ class Init(GoldenCase):
         self.git("commit", "-q", "-m", "app", cwd=self.proj)
 
     def g(self, *args, stdin=None):
-        return self.golden("init", *args, cwd=self.proj, root=self.root, stdin=stdin)
+        return self.distiflow("init", *args, cwd=self.proj, root=self.root, stdin=stdin)
 
     def files(self):
         return sorted(p.relative_to(self.proj).as_posix() for p in self.proj.rglob("*") if ".git" not in p.parts)
@@ -37,8 +37,8 @@ class Init(GoldenCase):
         self.assertEqual(prof["git"], {"worktrees": True, "push": "allowed", "base": "main"})
         self.assertEqual((prof["project"]["deny_terms"], prof["glossary"]), ([], {}))
         self.assertEqual(self.files(), before)
-        r = self.golden("task", "start", "fix", "x", cwd=self.proj, root=self.root)
-        self.assertIn("run /golden:init", r.stderr)
+        r = self.distiflow("task", "start", "fix", "x", cwd=self.proj, root=self.root)
+        self.assertIn("run /distiflow:init", r.stderr)
 
     def test_pnpm_make_and_pyproject_commands(self):
         """S1: commands follow the project's own tools."""
@@ -49,7 +49,7 @@ class Init(GoldenCase):
                                             "build": "make build", "typecheck": "make typecheck"})
         other = self.repo("py")
         w(other / "pyproject.toml", "[project]\nname='x'\n")
-        prof = tomllib.loads(self.golden("init", "--propose", cwd=other, root=self.root).stdout)
+        prof = tomllib.loads(self.distiflow("init", "--propose", cwd=other, root=self.root).stdout)
         self.assertEqual(prof["commands"], {"test": "python3 -m unittest"})
 
     def test_write_validates_and_creates(self):
@@ -57,14 +57,14 @@ class Init(GoldenCase):
         r = self.g("--write", "-", stdin='[git]\nworktree = false\n')
         self.assertEqual(r.returncode, 1)
         self.assertIn("did you mean worktrees?", r.stderr)
-        self.assertFalse((self.proj / ".golden").exists())
+        self.assertFalse((self.proj / ".distiflow").exists())
         proposal = self.g("--propose").stdout
         r = self.g("--write", "-", stdin=proposal)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((self.proj / ".golden/profile.toml").read_text(), proposal)
-        self.assertEqual((self.proj / ".golden/.gitignore").read_text(), "tasks/\ncontrib/\nprofile.local.toml\n")
-        self.assertIn("add .golden/ to .git/info/exclude", r.stdout)
-        self.assertEqual(self.golden("profile", "check", cwd=self.proj, root=self.root).returncode, 0)
+        self.assertEqual((self.proj / ".distiflow/profile.toml").read_text(), proposal)
+        self.assertEqual((self.proj / ".distiflow/.gitignore").read_text(), "tasks/\ncontrib/\nprofile.local.toml\n")
+        self.assertIn("add .distiflow/ to .git/info/exclude", r.stdout)
+        self.assertEqual(self.distiflow("profile", "check", cwd=self.proj, root=self.root).returncode, 0)
 
     def test_reinit_keeps_overrides(self):
         """S4: re-init shows the saved profile and the differences, and never drops a key silently."""
@@ -82,10 +82,10 @@ class Init(GoldenCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("practices.disable", r.stderr)
         self.assertIn("commands.test", r.stderr)
-        self.assertEqual((self.proj / ".golden/profile.toml").read_text(), saved)
+        self.assertEqual((self.proj / ".distiflow/profile.toml").read_text(), saved)
         r = self.g("--write", "-", "--allow-removal", stdin=trimmed)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((self.proj / ".golden/profile.toml").read_text(), trimmed)
+        self.assertEqual((self.proj / ".distiflow/profile.toml").read_text(), trimmed)
 
     def test_reinit_never_drops_deny_terms_silently(self):
         """S4 I2: shrinking a saved list such as deny_terms counts as a removal."""
@@ -94,31 +94,31 @@ class Init(GoldenCase):
         r = self.g("--write", "-", stdin='[project]\nname = "proj"\ndeny_terms = []\n')
         self.assertEqual(r.returncode, 1)
         self.assertIn("project.deny_terms", r.stderr)
-        self.assertEqual((self.proj / ".golden/profile.toml").read_text(), saved)
+        self.assertEqual((self.proj / ".distiflow/profile.toml").read_text(), saved)
 
     def test_detect_base_master(self):
         """S1: the base branch is the repo's own, not an assumed main."""
         r = self.repo("old")
         self.git("branch", "-m", "master", cwd=r)
-        prof = tomllib.loads(self.golden("init", "--propose", cwd=r, root=self.root).stdout)
+        prof = tomllib.loads(self.distiflow("init", "--propose", cwd=r, root=self.root).stdout)
         self.assertEqual(prof["git"]["base"], "master")
         bare = self.tmp / "remote.git"
         self.git("clone", "-q", "--bare", str(r), str(bare), cwd=self.tmp)
         clone = self.tmp / "clone"
         self.git("clone", "-q", str(bare), str(clone), cwd=self.tmp)
         self.git("switch", "-q", "-c", "topic", cwd=clone)
-        prof = tomllib.loads(self.golden("init", "--propose", cwd=clone, root=self.root).stdout)
+        prof = tomllib.loads(self.distiflow("init", "--propose", cwd=clone, root=self.root).stdout)
         self.assertEqual(prof["git"]["base"], "master")
 
     def test_signal_drift_warned(self):
         """T19 S5: a signal that appeared since init is reported at start."""
         write_profile(self.proj, '[project]\nname = "proj"\nsignals = ["has-docker", "has-tests", "node", "python"]\n')
-        r = self.golden("task", "start", "fix", "x", cwd=self.proj, root=self.root)
+        r = self.distiflow("task", "start", "fix", "x", cwd=self.proj, root=self.root)
         self.assertNotIn("signals differ", r.stdout)
         w(self.proj / "db/migrations/001.sql", "")
-        r = self.golden("task", "start", "fix", "y", cwd=self.proj, root=self.root)
+        r = self.distiflow("task", "start", "fix", "y", cwd=self.proj, root=self.root)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("signals differ from profile: +has-migrations; update with /golden:init", r.stdout)
+        self.assertIn("signals differ from profile: +has-migrations; update with /distiflow:init", r.stdout)
 
     def test_toml_write_roundtrip(self):
         """S1: the writer emits exactly what TOML reads back, for every profile shape."""

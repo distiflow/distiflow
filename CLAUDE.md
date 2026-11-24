@@ -1,9 +1,9 @@
-# golden-workflow
+# distiflow
 
-Claude Code plugin `golden`: a six-stage pipeline per task, tag-selected practices, a project
+Claude Code plugin `distiflow`: a six-stage pipeline per task, tag-selected practices, a project
 profile with layered overrides, claimed and resumable task state, and a sanitizing `/contribute`
-flow. One Python CLI (`bin/golden` → `lib/golden/`) owns every deterministic decision; skills and
-hooks call it.
+flow. One Python CLI (`bin/distiflow` → `lib/distiflow/`) owns every deterministic decision; skills
+and hooks call it.
 
 ## Artifacts
 
@@ -30,8 +30,8 @@ core/
   stages/<stage>.md          stage instructions (understand plan implement verify review ship)
   practices/<stage>/<id>.md  +++ TOML frontmatter +++ then body
   kinds.toml  signals.toml  glossary.toml  models.toml  limits.toml
-bin/golden         python entry
-lib/golden/        cli · paths · session · hooks · fsutil · overlay · profile · select · state ·
+bin/distiflow      python entry
+lib/distiflow/     cli · paths · session · hooks · fsutil · overlay · profile · select · state ·
                    claim · worktree · scan · similar · glossary · toml_write
 hooks/hooks.json   SessionStart session id · PostToolUse heartbeat · PreToolUse claim guard and Agent cap
 tests/             stdlib unittest, integration over temp git repos
@@ -43,22 +43,23 @@ CHANGELOG.md  LICENSE (MIT)  README.md
 
 ```
 python3 -m unittest discover -s tests -t . -q
-python3 bin/golden check --ci
+python3 bin/distiflow check --ci
 ```
 
 ## Constraints
 
 - Python ≥3.11, standard library only. No packages, no `requirements.txt`, no dependencies.
-- `lib/golden/fsutil.py` is the only module that opens files for writing.
-- Golden writes only inside `<repo>/.golden/`, `<repo>/../<repo>.golden/<task-id>/` and
-  `~/.golden/upstream`.
+- `lib/distiflow/fsutil.py` is the only module that opens files for writing.
+- Distiflow writes only inside `<repo>/.distiflow/`, `<repo>/../<repo>.distiflow/<task-id>/` and
+  `~/.distiflow/upstream`.
 - Upstream content holds no project facts (names, domains, commands). Scan `core/`, `skills/`,
-  `agents/` and `README.md` with the deny-list (`golden scan --deny-file …`) before committing them.
+  `agents/` and `README.md` with the deny-list (`distiflow scan --deny-file …`) before committing
+  them.
 - Exit codes: `0` ok · `1` refused or check failed · `2` needs confirmation · `3` environment missing.
 
 ## Tests
 
 - Every test traces to a risk or scenario named in its docstring or comment.
-- Integration by default: real `bin/golden` subprocess, real git repos in temp dirs.
+- Integration by default: real `bin/distiflow` subprocess, real git repos in temp dirs.
 - Each new case is seen failing first; its decisive failing line goes in the manifest as
   `red_evidence`.

@@ -4,7 +4,7 @@ import sys
 
 if sys.version_info < (3, 11):
     sys.stderr.write(
-        "golden needs Python 3.11 or newer (found %d.%d). Install: brew install python@3.12"
+        "distiflow needs Python 3.11 or newer (found %d.%d). Install: brew install python@3.12"
         " | apt install python3.12 | https://www.python.org/downloads/\n"
         % (sys.version_info[0], sys.version_info[1]))
     sys.exit(3)
@@ -12,6 +12,6 @@ if sys.version_info < (3, 11):
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
-from golden.cli import main
+from distiflow.cli import main
 
 sys.exit(main(sys.argv[1:]))

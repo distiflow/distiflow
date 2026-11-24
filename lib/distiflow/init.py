@@ -1,7 +1,7 @@
 import tomllib
 from pathlib import Path
 
-from golden import fsutil, profile, signals, toml_write
+from distiflow import fsutil, profile, signals, toml_write
 
 GITIGNORE = "tasks/\ncontrib/\nprofile.local.toml\n"
 
@@ -18,7 +18,7 @@ def proposal(root: Path, project: Path) -> dict:
 
 
 def _saved_path(project: Path) -> Path:
-    return project / ".golden" / profile.COMMITTED
+    return project / ".distiflow" / profile.COMMITTED
 
 
 def propose(root: Path, project: Path) -> str:
@@ -64,4 +64,4 @@ def write(root: Path, project: Path, text: str, allow_removal: bool) -> str:
         fsutil.create_exclusive(saved.parent / ".gitignore", GITIGNORE)
     except FileExistsError:
         pass
-    return "wrote .golden/profile.toml\nif .golden is not committed, add .golden/ to .git/info/exclude\n"
+    return "wrote .distiflow/profile.toml\nif .distiflow is not committed, add .distiflow/ to .git/info/exclude\n"

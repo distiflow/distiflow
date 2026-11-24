@@ -1,4 +1,4 @@
-from tests.helpers import GoldenCase, header, practice, sha_of, w, write_profile
+from tests.helpers import DistiflowCase, header, practice, sha_of, w, write_profile
 
 # (name, committed, local, expected exit, expected substring)
 T16_ROWS = [  # S6 R51
@@ -33,7 +33,7 @@ T9_ROWS = [  # I6 I16 S28 S29 R41 — fixture core has gate practice "g" and non
 ]
 
 
-class Profile(GoldenCase):
+class Profile(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root(practices={
@@ -44,9 +44,9 @@ class Profile(GoldenCase):
         proj = self.repo("p%d" % len(list(self.tmp.iterdir())))
         write_profile(proj, committed, local)
         for rel in overrides or {}:
-            w(proj / ".golden/overrides" / rel,
+            w(proj / ".distiflow/overrides" / rel,
               header(sha_of(self.root, rel)) + practice("g", ["verify"], gate=False))
-        r = self.golden("profile", "check", cwd=proj, root=self.root)
+        r = self.distiflow("profile", "check", cwd=proj, root=self.root)
         return r.returncode, r.stdout + r.stderr
 
     def test_profile_validation_table(self):

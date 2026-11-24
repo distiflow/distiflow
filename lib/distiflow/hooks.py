@@ -3,8 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-from golden import claim, fsutil, overlay, paths, state
-from golden.session import VALID_ID
+from distiflow import claim, fsutil, overlay, paths, state
+from distiflow.session import VALID_ID
 
 
 def session_start(payload: dict) -> None:
@@ -12,7 +12,7 @@ def session_start(payload: dict) -> None:
     sid = payload.get("session_id") or ""
     # The env file is sourced by a shell: only a strictly valid id may reach it.
     if env_file and VALID_ID.fullmatch(sid):
-        fsutil.append_text(Path(env_file), "export GOLDEN_SESSION_ID=%s\n" % sid)
+        fsutil.append_text(Path(env_file), "export DISTIFLOW_SESSION_ID=%s\n" % sid)
 
 
 def heartbeat(payload: dict) -> None:
@@ -20,7 +20,7 @@ def heartbeat(payload: dict) -> None:
     proj = paths.find_project(Path(payload.get("cwd") or os.getcwd()))
     if proj is None or not VALID_ID.fullmatch(sid):
         return
-    for d in (proj / ".golden" / "tasks").glob("T-*"):
+    for d in (proj / ".distiflow" / "tasks").glob("T-*"):
         claim.heartbeat(d, sid)
 
 
@@ -34,7 +34,7 @@ def _inside(target: Path, base) -> bool:
 
 
 def _tasks(proj: Path):
-    for d in sorted((proj / ".golden" / "tasks").glob("T-*")):
+    for d in sorted((proj / ".distiflow" / "tasks").glob("T-*")):
         try:
             yield d, state.load(d)
         except Exception:
@@ -51,7 +51,7 @@ def guard(payload: dict) -> dict | None:
     if proj is None:
         return None
     try:
-        held = json.loads((proj / ".golden" / "tasks" / "checkout.claim").read_text()).get("task")
+        held = json.loads((proj / ".distiflow" / "tasks" / "checkout.claim").read_text()).get("task")
     except Exception:
         held = None
     for d, st in _tasks(proj):
@@ -59,7 +59,7 @@ def guard(payload: dict) -> dict | None:
         if not claim.lost(d, sid) or claim.holder(d) is None:
             continue
         if _inside(target, st.get("worktree")) or (held == d.name and _inside(target, proj)):
-            return _deny("you no longer hold task %s; resume it with /golden:task resume %s" % (d.name, d.name))
+            return _deny("you no longer hold task %s; resume it with /distiflow:task resume %s" % (d.name, d.name))
     return None
 
 

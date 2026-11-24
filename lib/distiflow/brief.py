@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from golden import overlay, paths, profile, signals
-from golden.overlay import Resolved
-from golden.practices import STAGES, kinds, strip_header
-from golden.selection import Selection, select
+from distiflow import overlay, paths, profile, signals
+from distiflow.overlay import Resolved
+from distiflow.practices import STAGES, kinds, strip_header
+from distiflow.selection import Selection, select
 
 _WARN_KINDS = ("drift", "orphan", "stale-key")
 
@@ -34,7 +34,7 @@ def render_brief(*, task_id: str | None, kind: str, stage: str, version: str, st
     models = ["- %s: %s/%s%s" % (r, m, e, " (profile override)" if o else "") for r, m, e, o in roles]
     models.append("- session: %s (recommended)" % session)
     parts = [
-        "# %s · %s · stage %d/6 %s · golden %s" % (task_id or "ad-hoc", kind, STAGES.index(stage) + 1, stage, version),
+        "# %s · %s · stage %d/6 %s · distiflow %s" % (task_id or "ad-hoc", kind, STAGES.index(stage) + 1, stage, version),
         "## Stages\n" + "\n".join(stages),
         "## Stage\n%s%s" % ("(overridden locally)\n\n" if stage_text.source == "overridden" else "", text),
         "## Practices loaded\n" + _list(loaded),
@@ -67,7 +67,7 @@ def build_brief(root: Path, project: Path, stage: str, kind: str, task_id: str |
     if "signals" in prof.get("project", {}):
         diff = signals.drift(prof["project"]["signals"], signals.detect_signals(project, root))
         if diff:
-            warnings.append("signals differ from profile: %s; update with /golden:init" % " ".join(diff))
+            warnings.append("signals differ from profile: %s; update with /distiflow:init" % " ".join(diff))
     text = render_brief(task_id=task_id, kind=kind, stage=stage, version=paths.version(root), stage_text=stage_text,
                         selection=selection, plan=model_plan(stage, prof, tomls["models"]), warnings=warnings,
                         kinds_toml=tomls["kinds"])

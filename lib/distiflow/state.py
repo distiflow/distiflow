@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from golden import fsutil
+from distiflow import fsutil
 
 SCHEMA = 1
 STATUSES = ("active", "awaiting-merge", "cleanup-pending", "done", "abandoned")
@@ -35,7 +35,7 @@ def new(task_id: str, kind: str, desc: str, version: str, session: str, gates: l
 def load(task_dir: Path) -> dict:
     data = json.loads((task_dir / "state.json").read_text(encoding="utf-8"))
     if data.get("schema", SCHEMA) > SCHEMA:
-        raise StateError("task %s was written by a newer golden (schema %s); update golden"
+        raise StateError("task %s was written by a newer distiflow (schema %s); update distiflow"
                          % (data.get("id", task_dir.name), data["schema"]))
     return {**copy.deepcopy(_DEFAULTS), **data}
 
@@ -45,7 +45,7 @@ def save(task_dir: Path, st: dict) -> None:
 
 
 def mutate(task_dir: Path, session: str, fn) -> dict:
-    from golden import claim  # claim imports state for timestamps
+    from distiflow import claim  # claim imports state for timestamps
     with fsutil.locked(task_dir / "lock"):
         if not claim.holds(task_dir, session):
             raise StateError("you do not hold task %s" % task_dir.name)

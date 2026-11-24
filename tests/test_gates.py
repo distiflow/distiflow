@@ -1,7 +1,7 @@
 import json
 import shlex
 
-from tests.helpers import GoldenCase, practice, w, write_profile
+from tests.helpers import DistiflowCase, practice, w, write_profile
 
 # (name, command sequence, expected last exit, expected substring) — T8 I5 S11 S12 S19 S37 R1-R3 R6
 ROWS = [
@@ -12,7 +12,7 @@ ROWS = [
     ("empty evidence", ["pass g-under '  '"], 2, "evidence is empty"),
     ("evidence from file", ["<write ev.txt>", "pass g-under @ev.txt", "show"], 0, "g-under: line one"),
     ("evidence file too big", ["<write big.txt>", "pass g-under @big.txt"], 1, "over 20000 characters"),
-    ("advance past ship", ["<walk to ship>", "advance"], 1, "ship is the last stage; run golden ship"),
+    ("advance past ship", ["<walk to ship>", "advance"], 1, "ship is the last stage; run distiflow ship"),
     ("reopen future stage", ["reopen verify"], 1, "stage verify is not reached yet"),
     ("reopen keeps evidence", ["pass g-under ok", "advance", "reopen understand", "show"], 0,
      "g-under: ok (carried from run 1)"),
@@ -29,7 +29,7 @@ ROWS = [
 ]
 
 
-class Gates(GoldenCase):
+class Gates(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root(practices={
@@ -39,11 +39,11 @@ class Gates(GoldenCase):
         write_profile(self.proj, '[project]\nname = "proj"\n[git]\nworktrees = false\n')
         r = self.g("task", "start", "fix", "login")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.task = next((self.proj / ".golden/tasks").glob("T-*"))
+        self.task = next((self.proj / ".distiflow/tasks").glob("T-*"))
         self.id = self.task.name
 
     def g(self, *args, session="s-1"):
-        return self.golden(*args, cwd=self.proj, root=self.root, session=session)
+        return self.distiflow(*args, cwd=self.proj, root=self.root, session=session)
 
     def run_step(self, step):
         session = "s-1"
@@ -98,7 +98,7 @@ class Gates(GoldenCase):
         self.g("gate", "pass", self.id, "g-under", "--evidence", "repro: test_login fails")
         r = self.g("advance", self.id)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("start a fresh session: /golden:task resume %s" % self.id, r.stdout)
+        self.assertIn("start a fresh session: /distiflow:task resume %s" % self.id, r.stdout)
         st = json.loads((self.task / "state.json").read_text())
         ev = st["runs"][0]["evidence"]["g-under"]
         self.assertEqual((ev["text"], ev["session"], st["stage"]), ("repro: test_login fails", "s-1", "plan"))

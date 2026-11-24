@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def plugin_root() -> Path:
-    env = os.environ.get("GOLDEN_ROOT")
+    env = os.environ.get("DISTIFLOW_ROOT")
     return Path(env) if env else Path(__file__).resolve().parents[2]
 
 
@@ -14,16 +14,16 @@ def version(root: Path) -> str:
 
 
 def find_project(cwd: Path) -> Path | None:
-    """The project holding .golden/ around cwd; a task worktree dir <x>.golden/<id> maps back to <x>. No git."""
+    """The project holding .distiflow/ around cwd; a task worktree dir <x>.distiflow/<id> maps back to <x>. No git."""
     cwd = Path(cwd).absolute()
     chain = (cwd, *cwd.parents)
-    # Worktree mapping first: a worktree holds its own checked-out .golden/ with the committed profile.
+    # Worktree mapping first: a worktree holds its own checked-out .distiflow/ with the committed profile.
     for d in chain[1:]:
-        if d.name.endswith(".golden") and d.name != ".golden":
-            main = d.with_name(d.name[: -len(".golden")])
-            if (main / ".golden" / "tasks" / cwd.relative_to(d).parts[0]).is_dir():
+        if d.name.endswith(".distiflow") and d.name != ".distiflow":
+            main = d.with_name(d.name[: -len(".distiflow")])
+            if (main / ".distiflow" / "tasks" / cwd.relative_to(d).parts[0]).is_dir():
                 return main
-    return next((d for d in chain if (d / ".golden").is_dir()), None)
+    return next((d for d in chain if (d / ".distiflow").is_dir()), None)
 
 
 def project_root(start: Path) -> Path | None:

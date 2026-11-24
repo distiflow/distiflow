@@ -2,8 +2,8 @@ import json
 import re
 from pathlib import Path
 
-from golden import overlay
-from golden.worktree import git
+from distiflow import overlay
+from distiflow.worktree import git
 
 COMMANDS = ("test", "lint", "build", "typecheck")
 

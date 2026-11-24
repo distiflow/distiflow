@@ -1,7 +1,7 @@
 import tomllib
 import unittest
 
-from golden import glossary, similar
+from distiflow import glossary, similar
 from tests.helpers import REPO
 
 GLOSSARY = tomllib.loads((REPO / "core/glossary.toml").read_text())
@@ -22,7 +22,7 @@ class Glossary(unittest.TestCase):
         """S54: back-ticked and CamelCase/ALLCAPS words outside the glossary and stoplist are listed once, sorted."""
         text = "Use `FooBar` with WidgetHub. WidgetHub again. Run git in CI with JSON. A `gate` and `TOML`. Ok No `ab`"
         self.assertEqual(glossary.unknown_terms(text, GLOSSARY), ["FooBar", "WidgetHub"])
-        self.assertEqual(glossary.unknown_terms("run `golden note <id> open <text>` in `.golden/tasks/<id>/` with `--merged` and `[commands]`", GLOSSARY), [])
+        self.assertEqual(glossary.unknown_terms("run `distiflow note <id> open <text>` in `.distiflow/tasks/<id>/` with `--merged` and `[commands]`", GLOSSARY), [])
 
     def test_rewrite_lists_counts(self):
         """F1: rewriting replaces whole words, any case, and reports what changed how often."""

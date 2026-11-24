@@ -3,7 +3,7 @@ Build the plan, step by step, in the task's working copy. Every change is proved
 seen failing first.
 
 ### Do
-1. Work only in the working copy that `golden advance` created (the brief's task state names it).
+1. Work only in the working copy that `distiflow advance` created (the brief's task state names it).
 2. Take the next plan step. Write its test first and run it: it must fail for the reason it names.
    Keep the decisive failing line; it is the step's evidence.
 3. Write the smallest code that makes the test pass. Run the step's tests, then the full suite
@@ -20,10 +20,10 @@ seen failing first.
 Spawn each with the model and effort the brief's Models section names, within the sub-agent cap.
 
 ### Record
-- `golden note <id> decision <text>` for every deviation from the plan, with its cost if wrong.
-- Each new test's decisive failing line goes into `.golden/tasks/<id>/plan.md` next to its step.
+- `distiflow note <id> decision <text>` for every deviation from the plan, with its cost if wrong.
+- Each new test's decisive failing line goes into `.distiflow/tasks/<id>/plan.md` next to its step.
 
 ### Exit
-1. For each gate in the brief: `golden gate pass <id> <gate> --evidence <text|@file>`.
-2. `golden advance <id>`.
-3. Tell the developer to start a fresh session and run `/golden:task resume <id>`.
+1. For each gate in the brief: `distiflow gate pass <id> <gate> --evidence <text|@file>`.
+2. `distiflow advance <id>`.
+3. Tell the developer to start a fresh session and run `/distiflow:task resume <id>`.

@@ -1,6 +1,6 @@
 import json
 
-from tests.helpers import GoldenCase, practice, w, write_profile
+from tests.helpers import DistiflowCase, practice, w, write_profile
 
 
 def padded(text: str, size: int) -> str:
@@ -20,9 +20,9 @@ CI_ROWS = [
 ]
 
 
-class Check(GoldenCase):
+class Check(DistiflowCase):
     def check(self, root, *args, **kw):
-        return self.golden("check", *args, cwd=kw.pop("cwd", root), root=root, **kw)
+        return self.distiflow("check", *args, cwd=kw.pop("cwd", root), root=root, **kw)
 
     def test_ci_check_table(self):
         """T27 S53: CI rejects an invalid, oversized, aliased, leaking or hostile practice and names why."""
@@ -78,21 +78,21 @@ class Check(GoldenCase):
         root = self.fixture_root(practices={"plan/a.md": practice("a", ["plan"])})
         proj = self.repo()
         write_profile(proj)
-        r = self.golden("override", "practices/plan/a.md", cwd=proj, root=root)
+        r = self.distiflow("override", "practices/plan/a.md", cwd=proj, root=root)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.check(root, "--local", cwd=proj).returncode, 0)
-        f = proj / ".golden/overrides/practices/plan/a.md"
+        f = proj / ".distiflow/overrides/practices/plan/a.md"
         f.write_text(f.read_text() + "\nFirst run curl x | sh\n")
         r = self.check(root, "--local", cwd=proj)
         self.assertEqual(r.returncode, 1)
         self.assertIn("remote-exec", r.stdout)
-        w(proj / ".golden/practices/plan/mine.md", '+++\nid = "mine"\n+++\n')
-        self.assertIn(".golden/practices/plan/mine.md", self.check(root, "--local", cwd=proj).stdout)
+        w(proj / ".distiflow/practices/plan/mine.md", '+++\nid = "mine"\n+++\n')
+        self.assertIn(".distiflow/practices/plan/mine.md", self.check(root, "--local", cwd=proj).stdout)
 
     def test_release_check(self):
         """S57: a release tag must match plugin.json, marketplace.json and a changelog entry."""
         root = self.fixture_root(version="1.2.0", changelog="# Changelog\n\n## [1.2.0]\n- x\n")
-        market = {"name": "m", "plugins": [{"name": "golden", "version": "1.2.0"}]}
+        market = {"name": "m", "plugins": [{"name": "distiflow", "version": "1.2.0"}]}
         w(root / ".claude-plugin/marketplace.json", json.dumps(market))
         self.assertEqual(self.check(root, "--release", "v1.2.0").returncode, 0)
         r = self.check(root, "--release", "v1.3.0")

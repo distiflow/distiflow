@@ -3,7 +3,7 @@ Decide how the change will be made, in steps small enough to check one at a time
 The plan names files, interfaces and tests, so the next stage needs no design decisions.
 
 ### Do
-1. Read `.golden/tasks/<id>/spec.md` and the decisions recorded so far.
+1. Read `.distiflow/tasks/<id>/spec.md` and the decisions recorded so far.
 2. Where a decision has more than one defensible answer (data model, where state lives, a library,
    whether to extend existing code), list two or three options with their cost, recommend one,
    and get the developer's pick.
@@ -20,10 +20,10 @@ The plan names files, interfaces and tests, so the next stage needs no design de
 Spawn it with the model and effort the brief's Models section names, within the sub-agent cap.
 
 ### Record
-- The plan goes to `.golden/tasks/<id>/plan.md`.
-- `golden note <id> decision <text>` for each option chosen, with the reason.
+- The plan goes to `.distiflow/tasks/<id>/plan.md`.
+- `distiflow note <id> decision <text>` for each option chosen, with the reason.
 
 ### Exit
-1. For each gate in the brief: `golden gate pass <id> <gate> --evidence <text|@file>`.
-2. `golden advance <id>`. This creates the working copy for implementation.
-3. Tell the developer to start a fresh session and run `/golden:task resume <id>`.
+1. For each gate in the brief: `distiflow gate pass <id> <gate> --evidence <text|@file>`.
+2. `distiflow advance <id>`. This creates the working copy for implementation.
+3. Tell the developer to start a fresh session and run `/distiflow:task resume <id>`.

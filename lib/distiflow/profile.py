@@ -2,7 +2,7 @@ import difflib
 import tomllib
 from pathlib import Path
 
-from golden.practices import RUN_COSTS, STAGES, Practice
+from distiflow.practices import RUN_COSTS, STAGES, Practice
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 _DISABLE = [{"id": str, "reason": str}]
@@ -134,11 +134,11 @@ def _gate_rules(committed: dict, local: dict, practices: list[Practice], upstrea
 
 
 def load_profile(project: Path, practices: list[Practice], roles=(), upstream_gates=frozenset()) -> tuple[dict, list[str]]:
-    golden = project / ".golden"
-    if not (golden / COMMITTED).is_file():
-        raise ProfileError(["no .golden/%s in %s (run /golden:init)" % (COMMITTED, project)])
-    committed = _read(golden / COMMITTED, roles)
-    local = _read(golden / LOCAL, roles) if (golden / LOCAL).is_file() else {}
+    distiflow = project / ".distiflow"
+    if not (distiflow / COMMITTED).is_file():
+        raise ProfileError(["no .distiflow/%s in %s (run /distiflow:init)" % (COMMITTED, project)])
+    committed = _read(distiflow / COMMITTED, roles)
+    local = _read(distiflow / LOCAL, roles) if (distiflow / LOCAL).is_file() else {}
     errs, warns = _gate_rules(committed, local, practices, upstream_gates, project)
     if errs:
         raise ProfileError(errs)
@@ -159,7 +159,7 @@ def gate_disables(profile: dict) -> dict[str, str]:
 
 def check_text(text: str, root: Path, project: Path) -> dict:
     """Validate a committed profile given as text, as load_for would; raises ProfileError."""
-    from golden import overlay
+    from distiflow import overlay
     practices = overlay.load_practices(root, project)[0]
     upstream = frozenset(p.id for p in overlay.load_practices(root, None)[0] if p.gate)
     data = _parse(text, COMMITTED, tuple(overlay.load_toml("models.toml", root, project)[0].get("roles", {})))
@@ -171,7 +171,7 @@ def check_text(text: str, root: Path, project: Path) -> dict:
 
 def load_for(root: Path, project: Path, practices: list[Practice]) -> tuple[dict, list[str]]:
     """load_profile with the roles and upstream gates read from the plugin root."""
-    from golden import overlay
+    from distiflow import overlay
     upstream, _ = overlay.load_practices(root, None)
     models, _ = overlay.load_toml("models.toml", root, project)
     return load_profile(project, practices, roles=tuple(models.get("roles", {})),

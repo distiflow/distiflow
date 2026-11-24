@@ -21,11 +21,11 @@ Nothing is designed or built here: this stage settles what "done" means.
 Spawn each with the model and effort the brief's Models section names, within the sub-agent cap.
 
 ### Record
-- `golden note <id> decision <text>` for every settled decision.
-- `golden note <id> open <text>` for every question still open; `golden note <id> close <n>` when settled.
-- The agreed behaviour or the reproduction goes to `.golden/tasks/<id>/spec.md`.
+- `distiflow note <id> decision <text>` for every settled decision.
+- `distiflow note <id> open <text>` for every question still open; `distiflow note <id> close <n>` when settled.
+- The agreed behaviour or the reproduction goes to `.distiflow/tasks/<id>/spec.md`.
 
 ### Exit
-1. For each gate in the brief: `golden gate pass <id> <gate> --evidence <text|@file>`.
-2. `golden advance <id>`.
-3. Tell the developer to start a fresh session and run `/golden:task resume <id>`.
+1. For each gate in the brief: `distiflow gate pass <id> <gate> --evidence <text|@file>`.
+2. `distiflow advance <id>`.
+3. Tell the developer to start a fresh session and run `/distiflow:task resume <id>`.

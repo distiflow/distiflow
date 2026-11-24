@@ -9,7 +9,7 @@ Review the whole change with fresh eyes, against the agreed behaviour and the pr
    trust boundary, state shared across concurrent work, a resource that is opened and never closed,
    a query or loop that grows with the data, a test that would pass with the bug present.
 5. Grade each finding by what a person using the software gets if it ships. Fix the serious ones in
-   the implement stage (`golden stage reopen <id> implement`); record the rest.
+   the implement stage (`distiflow stage reopen <id> implement`); record the rest.
 
 ### Roles
 - reviewer: one read-only reviewer per axis (spec, standards) on a fresh context, given the diff
@@ -17,10 +17,10 @@ Review the whole change with fresh eyes, against the agreed behaviour and the pr
 Spawn each with the model and effort the brief's Models section names, within the sub-agent cap.
 
 ### Record
-- The review goes to `.golden/tasks/<id>/reviews/`.
-- `golden note <id> decision <text>` for each finding you decide not to fix, with why.
+- The review goes to `.distiflow/tasks/<id>/reviews/`.
+- `distiflow note <id> decision <text>` for each finding you decide not to fix, with why.
 
 ### Exit
-1. For each gate in the brief: `golden gate pass <id> <gate> --evidence <text|@file>`.
-2. `golden advance <id>`.
-3. Tell the developer to start a fresh session and run `/golden:task resume <id>`.
+1. For each gate in the brief: `distiflow gate pass <id> <gate> --evidence <text|@file>`.
+2. `distiflow advance <id>`.
+3. Tell the developer to start a fresh session and run `/distiflow:task resume <id>`.

@@ -4,8 +4,8 @@ import secrets
 import time
 from pathlib import Path
 
-from golden import fsutil
-from golden.state import now
+from distiflow import fsutil
+from distiflow.state import now
 
 
 class Held(Exception):

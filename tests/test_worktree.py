@@ -1,12 +1,12 @@
 import json
 import shutil
 
-from tests.helpers import GoldenCase, practice, w, write_profile
+from tests.helpers import DistiflowCase, practice, w, write_profile
 
 PROFILE = '[project]\nname = "proj"\n[git]\npush = "%s"\nworktrees = %s\n'
 
 
-class WorktreeCase(GoldenCase):
+class WorktreeCase(DistiflowCase):
     """A repo with a committed profile, ignored task state, a bare remote and the gh stub."""
     practices = {}
     push, worktrees = "forbidden", "true"
@@ -17,16 +17,16 @@ class WorktreeCase(GoldenCase):
         self.root = self.fixture_root(practices=self.practices)
         self.proj = self.repo()
         write_profile(self.proj, PROFILE % (self.push, self.worktrees))
-        w(self.proj / ".gitignore", ".golden/tasks/\n.golden/profile.local.toml\n")
+        w(self.proj / ".gitignore", ".distiflow/tasks/\n.distiflow/profile.local.toml\n")
         self.git("add", ".", cwd=self.proj)
-        self.git("commit", "-q", "-m", "golden profile", cwd=self.proj)
+        self.git("commit", "-q", "-m", "distiflow profile", cwd=self.proj)
         self.bare = self.tmp / "remote.git"
         self.git("init", "-q", "--bare", str(self.bare), cwd=self.tmp)
         self.git("remote", "add", "origin", str(self.bare), cwd=self.proj)
         self.git("push", "-q", "-u", "origin", "main", cwd=self.proj)
 
     def g(self, *args, session="s-1", cwd=None):
-        return self.golden(*args, cwd=cwd or self.proj, root=self.root, session=session)
+        return self.distiflow(*args, cwd=cwd or self.proj, root=self.root, session=session)
 
     def ok(self, *args, **kw):
         r = self.g(*args, **kw)
@@ -34,9 +34,9 @@ class WorktreeCase(GoldenCase):
         return r
 
     def start(self, desc="add login", session="s-1"):
-        before = set((self.proj / ".golden/tasks").glob("T-*"))
+        before = set((self.proj / ".distiflow/tasks").glob("T-*"))
         self.ok("task", "start", "feature", *desc.split(), session=session)
-        return (set((self.proj / ".golden/tasks").glob("T-*")) - before).pop().name
+        return (set((self.proj / ".distiflow/tasks").glob("T-*")) - before).pop().name
 
     def advance_to(self, tid, stage, session="s-1"):
         while self.st(tid)["stage"] != stage:
@@ -46,10 +46,10 @@ class WorktreeCase(GoldenCase):
         return r
 
     def st(self, tid):
-        return json.loads((self.proj / ".golden/tasks" / tid / "state.json").read_text())
+        return json.loads((self.proj / ".distiflow/tasks" / tid / "state.json").read_text())
 
     def wt(self, tid):
-        return self.tmp / "proj.golden" / tid
+        return self.tmp / "proj.distiflow" / tid
 
     def head(self, cwd):
         return self.git("rev-parse", "HEAD", cwd=cwd).strip()
@@ -117,7 +117,7 @@ class Worktree(WorktreeCase):
         r = self.ok("ship", tid)
         self.assertEqual(self.st(tid)["status"], "done")
         self.assertFalse(self.wt(tid).exists())
-        self.assertFalse((self.proj / ".golden/tasks" / tid / "claim").exists())
+        self.assertFalse((self.proj / ".distiflow/tasks" / tid / "claim").exists())
         r = self.ok("ship", tid)
         self.assertIn("task %s is already done" % tid, r.stdout)
 
@@ -144,7 +144,7 @@ class Worktree(WorktreeCase):
         r = self.g("ship", tid)
         self.assertEqual(r.returncode, 1)
         self.assertIn("cleanup pending:", r.stderr)
-        self.assertIn("retry with golden ship %s" % tid, r.stderr)
+        self.assertIn("retry with distiflow ship %s" % tid, r.stderr)
         self.assertEqual(self.st(tid)["status"], "cleanup-pending")
         self.git("worktree", "unlock", str(self.wt(tid)), cwd=self.proj)
         self.ok("ship", tid)
@@ -171,9 +171,9 @@ class Worktree(WorktreeCase):
         self.advance_to(tid, "implement")
         self.commit_in(self.wt(tid))
         shutil.rmtree(self.wt(tid))
-        (self.proj / ".golden/tasks" / tid / "claim").unlink()
+        (self.proj / ".distiflow/tasks" / tid / "claim").unlink()
         r = self.ok("task", "resume", tid)
-        self.assertIn("working copy missing: %s; restore with golden worktree restore %s" % (self.wt(tid), tid), r.stdout)
+        self.assertIn("working copy missing: %s; restore with distiflow worktree restore %s" % (self.wt(tid), tid), r.stdout)
         r = self.ok("worktree", "restore", tid)
         self.assertIn("uncommitted work in the old copy is gone", r.stdout)
         self.assertTrue((self.wt(tid) / "feature.txt").exists())
@@ -191,10 +191,10 @@ class Worktree(WorktreeCase):
         self.assertTrue((self.wt(tid) / "dirty.txt").exists())
         self.ok("task", "abandon", tid, "--confirm")
         self.assertEqual((self.st(tid)["status"], self.wt(tid).exists()), ("abandoned", False))
-        self.assertFalse((self.proj / ".golden/tasks" / tid / "claim").exists())
+        self.assertFalse((self.proj / ".distiflow/tasks" / tid / "claim").exists())
 
-    def test_golden_from_worktree_cwd(self):
-        """Review Focus 2: golden run inside the worktree writes state in the main checkout, nothing in the worktree."""
+    def test_distiflow_from_worktree_cwd(self):
+        """Review Focus 2: distiflow run inside the worktree writes state in the main checkout, nothing in the worktree."""
         tid = self.start()
         self.advance_to(tid, "implement")
         sub = self.wt(tid) / "sub"

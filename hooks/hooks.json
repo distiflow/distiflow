@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/golden\" hook session-start"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/distiflow\" hook session-start"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/golden\" hook heartbeat"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/distiflow\" hook heartbeat"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/golden\" hook guard"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/distiflow\" hook guard"
           }
         ]
       },
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/golden\" hook agent-cap"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/distiflow\" hook agent-cap"
           }
         ]
       }

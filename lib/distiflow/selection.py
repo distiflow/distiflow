@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
-from golden.practices import RUN_COSTS, Issue, Practice
-from golden.profile import gate_disables
+from distiflow.practices import RUN_COSTS, Issue, Practice
+from distiflow.profile import gate_disables
 
 GATE_OVER_CAP = "over cost cap, kept: gate"
 

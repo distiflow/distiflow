@@ -1,10 +1,10 @@
 import json
 
-from tests.helpers import GoldenCase, practice, w, write_profile
+from tests.helpers import DistiflowCase, practice, w, write_profile
 from tests.test_profile import T9_ROWS, T16_ROWS
 
 
-class Start(GoldenCase):
+class Start(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root(practices={
@@ -13,10 +13,10 @@ class Start(GoldenCase):
         self.proj = self.repo()
 
     def start(self, *args, session="s-1"):
-        return self.golden("task", "start", *args, cwd=self.proj, root=self.root, session=session)
+        return self.distiflow("task", "start", *args, cwd=self.proj, root=self.root, session=session)
 
     def tasks(self):
-        d = self.proj / ".golden/tasks"
+        d = self.proj / ".distiflow/tasks"
         return sorted(d.iterdir()) if d.exists() else []
 
     def test_start_writes_state_claim_and_brief(self):
@@ -52,7 +52,7 @@ class Start(GoldenCase):
         self.assertEqual(r.returncode, 3)
         self.assertIn("no session id", r.stderr)
         self.assertEqual(self.tasks(), [])
-        r = self.golden("task", "list", cwd=self.proj, root=self.root, session=None)
+        r = self.distiflow("task", "list", cwd=self.proj, root=self.root, session=None)
         self.assertEqual((r.returncode, r.stdout), (0, "no tasks\n"))
 
     def test_refuses_on_profile_errors(self):
@@ -66,26 +66,26 @@ class Start(GoldenCase):
                 self.assertEqual(r.returncode, 1, r.stdout)
                 self.assertIn(msg, r.stderr)
                 self.assertEqual(self.tasks(), [])
-                (self.proj / ".golden/profile.local.toml").unlink(missing_ok=True)
+                (self.proj / ".distiflow/profile.local.toml").unlink(missing_ok=True)
 
     def test_no_profile_asks_init(self):
         """S7: without a profile, start asks for init and creates nothing."""
         r = self.start("fix", "x")
         self.assertEqual(r.returncode, 1)
-        self.assertIn("no golden profile; run /golden:init", r.stderr)
-        self.assertFalse((self.proj / ".golden").exists())
+        self.assertIn("no distiflow profile; run /distiflow:init", r.stderr)
+        self.assertFalse((self.proj / ".distiflow").exists())
 
-    def test_heartbeat_hook_outside_golden_is_silent(self):
-        """Review Focus 5: the heartbeat hook outside golden, or on a garbage claim, says and writes nothing."""
+    def test_heartbeat_hook_outside_distiflow_is_silent(self):
+        """Review Focus 5: the heartbeat hook outside distiflow, or on a garbage claim, says and writes nothing."""
         plain = self.tmp / "plain"
         plain.mkdir()
-        w(self.proj / ".golden/tasks/T-x/claim", "not json")
+        w(self.proj / ".distiflow/tasks/T-x/claim", "not json")
         before = sorted(p for p in self.tmp.rglob("*") if ".git" not in p.parts)
         for cwd, stdin in ((plain, {"session_id": "s-1", "cwd": str(plain)}),
                            (self.proj, {"session_id": "s-1", "cwd": str(self.proj)}),
                            (self.proj, "garbage")):
             with self.subTest(cwd=cwd.name, stdin=stdin):
-                r = self.golden("hook", "heartbeat", cwd=cwd,
+                r = self.distiflow("hook", "heartbeat", cwd=cwd,
                                 stdin=stdin if isinstance(stdin, str) else json.dumps(stdin))
                 self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
         self.assertEqual(sorted(p for p in self.tmp.rglob("*") if ".git" not in p.parts), before)

@@ -2,7 +2,7 @@ import math
 import re
 from collections import Counter
 
-from golden.glossary import body_lines
+from distiflow.glossary import body_lines
 
 STOPWORDS = set("a an and are as at be before by for from if in into is it its of on one only or so such that the "
                 "then this to when with".split())
