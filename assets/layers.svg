@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 280" role="img" aria-label="Three layers: upstream core shared by everyone, the project's committed profile and overrides, and your personal local profile.">
+  <rect width="880" height="280" rx="20" fill="#14161A"/>
+  <text x="48" y="58" font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="1.2" fill="#E0B75D">SHARED BY DEFAULT · BENT WHERE YOU NEED IT</text>
+  <g fill="none" stroke="#5B616A" stroke-width="9">
+    <rect x="70" y="92" width="110" height="110" rx="26"/>
+    <rect x="98" y="118" width="110" height="110" rx="26" fill="#14161A"/>
+  </g>
+  <rect x="126" y="144" width="110" height="110" rx="26" fill="#E0B75D"/>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif">
+    <circle cx="310" cy="110" r="7" fill="none" stroke="#5B616A" stroke-width="4"/>
+    <text x="332" y="116" font-size="18" font-weight="600" fill="#F2EEE0">upstream</text>
+    <text x="440" y="116" font-size="14" fill="#B7B2A5">core/ and skills/ · the same for everyone who installs</text>
+    <circle cx="310" cy="170" r="7" fill="none" stroke="#5B616A" stroke-width="4"/>
+    <text x="332" y="176" font-size="18" font-weight="600" fill="#F2EEE0">project</text>
+    <text x="440" y="176" font-size="14" fill="#B7B2A5">.distiflow/profile.toml + overrides/ · committed</text>
+    <circle cx="310" cy="230" r="8" fill="#E0B75D"/>
+    <text x="332" y="236" font-size="18" font-weight="600" fill="#F2EEE0">you</text>
+    <text x="440" y="236" font-size="14" fill="#B7B2A5">profile.local.toml · personal, never loosens a gate</text>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" role="img" aria-label="Six stages: understand, plan, implement, verify, review, ship. Each stage ends at a gate that needs recorded evidence.">
+  <rect width="880" height="300" rx="20" fill="#14161A"/>
+  <text x="48" y="58" font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="1.2" fill="#E0B75D">EVERY TASK · SIX STAGES · A GATE AT EACH EXIT</text>
+  <path d="M90 150 H690" stroke="#5B616A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M736 150 H790" stroke="#E0B75D" stroke-width="10" stroke-linecap="round"/>
+  <g fill="#E0B75D">
+    <rect x="152" y="142" width="16" height="16" rx="3" transform="rotate(45 160 150)"/>
+    <rect x="292" y="142" width="16" height="16" rx="3" transform="rotate(45 300 150)"/>
+    <rect x="432" y="142" width="16" height="16" rx="3" transform="rotate(45 440 150)"/>
+    <rect x="572" y="142" width="16" height="16" rx="3" transform="rotate(45 580 150)"/>
+    <rect x="712" y="142" width="16" height="16" rx="3" transform="rotate(45 720 150)"/>
+  </g>
+  <g fill="#14161A" stroke="#5B616A" stroke-width="7">
+    <circle cx="90" cy="150" r="13"/><circle cx="230" cy="150" r="13"/><circle cx="370" cy="150" r="13"/>
+    <circle cx="510" cy="150" r="13"/><circle cx="650" cy="150" r="13"/>
+  </g>
+  <circle cx="790" cy="150" r="24" fill="#E0B75D"/>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <g font-size="19" font-weight="600" fill="#F2EEE0">
+      <text x="90" y="210">understand</text><text x="230" y="210">plan</text><text x="370" y="210">implement</text>
+      <text x="510" y="210">verify</text><text x="650" y="210">review</text><text x="790" y="210">ship</text>
+    </g>
+    <g font-size="13.5" fill="#B7B2A5">
+      <text x="90" y="236">behaviour first</text><text x="230" y="236">pick an approach</text>
+      <text x="370" y="236">red, then green</text><text x="510" y="236">proof, not claims</text>
+      <text x="650" y="236">fresh eyes</text><text x="790" y="236">branch, hand-off</text>
+    </g>
+  </g>
+  <text x="48" y="104" font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" font-size="14" fill="#B7B2A5">feature · fix · debug · perf · ux — the kind sets each stage's emphasis</text>
+</svg>

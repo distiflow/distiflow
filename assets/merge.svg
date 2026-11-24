@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 340" role="img" aria-label="Three ways to contribute: a practice, a skill, or an edit. Each is sanitized and checked, sent as a change request, and reaches every install.">
+  <rect width="880" height="340" rx="20" fill="#14161A"/>
+  <text x="48" y="58" font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="1.2" fill="#E0B75D">ONE LESSON IN · EVERY INSTALL OUT</text>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" text-anchor="end">
+    <g font-size="18" font-weight="600" fill="#F2EEE0">
+      <text x="250" y="114">a practice</text><text x="250" y="184">a skill</text><text x="250" y="254">an edit</text>
+    </g>
+    <g font-size="13" fill="#B7B2A5">
+      <text x="250" y="134">a lesson from your project</text><text x="250" y="204">one of your own</text>
+      <text x="250" y="274">a better tool for a step</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#5B616A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M290 110 H440 C482 110 486 140 494 180 L504 226 C510 248 520 250 540 250"/>
+    <path d="M290 180 H380 C412 180 418 210 424 228 C430 246 440 250 460 250"/>
+    <path d="M290 250 H600"/>
+  </g>
+  <g fill="#14161A" stroke="#5B616A" stroke-width="7">
+    <circle cx="284" cy="110" r="12"/><circle cx="284" cy="180" r="12"/><circle cx="284" cy="250" r="12"/>
+  </g>
+  <path d="M604 250 H730" stroke="#E0B75D" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="760" cy="250" r="30" fill="#E0B75D"/>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="520" y="286" font-size="13" fill="#B7B2A5">sanitize · scan · confirm</text>
+    <text x="668" y="234" font-size="13" fill="#E0B75D">change request</text>
+    <text x="760" y="312" font-size="15" font-weight="600" fill="#F2EEE0">every install</text>
+  </g>
+</svg>
