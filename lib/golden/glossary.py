@@ -3,7 +3,7 @@ import re
 STOPLIST = {w.lower() for w in (
     "git CI API TOML JSON YAML CLI URL HTTP HTTPS SQL README CHANGELOG TODO PATH ENV UTF SSH GitHub Python "
     "Markdown Claude ASCII UUID CSV HTML CSS MCP LLM").split()}
-_BACKTICK = re.compile(r"`([^`\n]+)`")
+_BACKTICK = re.compile(r"`([A-Za-z][\w-]*)`")  # commands, paths and flags in backticks are not terms
 _CAPS = re.compile(r"\b(?:[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z]{3,})\b")
 
 
