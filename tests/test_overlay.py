@@ -1,9 +1,9 @@
-from golden.overlay import load_practices, load_toml
-from golden.practices import Malformed, parse_practice
-from tests.helpers import KINDS, GoldenCase, header, practice, sha_of, w
+from distiflow.overlay import load_practices, load_toml
+from distiflow.practices import Malformed, parse_practice
+from tests.helpers import KINDS, DistiflowCase, header, practice, sha_of, w
 
 
-class Overlay(GoldenCase):
+class Overlay(DistiflowCase):
     def test_practice_parse_errors_name_the_reason(self):
         """R10 S22: a malformed practice is rejected with a reason, never half-loaded."""
         rows = {"no-fence": "id='a'", "unclosed": "+++\nid='a'\n", "bad-toml": "+++\nid=\n+++\n",
@@ -35,7 +35,7 @@ class Overlay(GoldenCase):
         """S23 I9: a local practice never silently replaces an upstream one."""
         root = self.fixture_root(practices={"plan/a.md": practice("a", ["plan"], body="UP")})
         proj = self.repo()
-        w(proj / ".golden/practices/plan/a.md", practice("a", ["plan"], body="LOCAL"))
+        w(proj / ".distiflow/practices/plan/a.md", practice("a", ["plan"], body="LOCAL"))
         ps, issues = load_practices(root, proj)
         self.assertEqual([p.body.strip() for p in ps if p.id == "a"], ["UP"])
         self.assertIn(("clash", "a"), [(i.kind, i.ref) for i in issues])
@@ -44,7 +44,7 @@ class Overlay(GoldenCase):
         """S60 S61 R49 I10: an override wins, and upstream change or removal is reported."""
         root = self.fixture_root(practices={"plan/a.md": practice("a", ["plan"], body="v1")})
         proj = self.repo()
-        w(proj / ".golden/overrides/practices/plan/a.md",
+        w(proj / ".distiflow/overrides/practices/plan/a.md",
           header(sha_of(root, "practices/plan/a.md")) + practice("a", ["plan"], body="mine"))
         ps, issues = load_practices(root, proj)
         self.assertEqual(next(p for p in ps if p.id == "a").source, "overridden")
@@ -60,8 +60,8 @@ class Overlay(GoldenCase):
         """R50: an override key upstream no longer has is ignored and reported, not a crash."""
         root = self.fixture_root()
         proj = self.repo()
-        w(proj / ".golden/overrides/limits.toml",
-          "# golden-override upstream=x version=0.1.0\n[budget]\nplan = 9000\n[gone]\nk = 1\n")
+        w(proj / ".distiflow/overrides/limits.toml",
+          "# distiflow-override upstream=x version=0.1.0\n[budget]\nplan = 9000\n[gone]\nk = 1\n")
         merged, issues = load_toml("limits.toml", root, proj)
         self.assertEqual((merged["budget"]["plan"], merged["budget"]["verify"]), (9000, 3000))
         self.assertNotIn("gone", merged)

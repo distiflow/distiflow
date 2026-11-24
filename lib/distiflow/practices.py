@@ -5,7 +5,7 @@ from pathlib import Path
 
 STAGES = ("understand", "plan", "implement", "verify", "review", "ship")
 RUN_COSTS = ("cheap", "medium", "expensive")
-_HEADER_PREFIXES = ("<!-- golden-override ", "# golden-override ")
+_HEADER_PREFIXES = ("<!-- distiflow-override ", "# distiflow-override ")
 _REQUIRED = ("id", "stages", "run_cost")
 _TYPES = {"id": str, "stages": list, "kinds": list, "signals": list, "run_cost": str,
           "gate": bool, "evidence": str, "priority": int}

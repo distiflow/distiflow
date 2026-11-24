@@ -2,14 +2,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, check, contrib, hooks, init, overlay, paths, profile, scan, session, state, task
-from golden.practices import STAGES
+from distiflow import brief, check, contrib, hooks, init, overlay, paths, profile, scan, session, state, task
+from distiflow.practices import STAGES
 
 
 def _project() -> Path | None:
     proj = paths.project_root(Path.cwd())
     if proj is None:
-        print("golden: not inside a git repository", file=sys.stderr)
+        print("distiflow: not inside a git repository", file=sys.stderr)
     return proj
 
 
@@ -45,7 +45,7 @@ def cmd_override(args) -> int:
     try:
         target = overlay.make_override(args.target, root, proj)
     except overlay.OverrideError as e:
-        print("golden: " + str(e), file=sys.stderr)
+        print("distiflow: " + str(e), file=sys.stderr)
         return 1
     print("wrote %s; edit it, the header records the upstream it shadows" % target.relative_to(proj))
     return 0
@@ -62,7 +62,7 @@ def cmd_brief(args) -> int:
             print(line, file=sys.stderr)
         return 1
     except brief.UnknownKind as e:
-        print("golden: %s" % e, file=sys.stderr)
+        print("distiflow: %s" % e, file=sys.stderr)
         return 2
     print(text, end="")
     return 0
@@ -83,7 +83,7 @@ def cmd_init(args) -> int:
             print(line, file=sys.stderr)
         return 1
     except init.InitError as e:
-        print("golden: %s" % e, file=sys.stderr)
+        print("distiflow: %s" % e, file=sys.stderr)
         return 1
     return 0
 
@@ -107,7 +107,7 @@ def cmd_contrib(args) -> int:
         elif args.sub == "discard":
             print(contrib.discard(proj, args.slug, args.confirm), end="")
     except contrib.ContribError as e:
-        print("golden: %s" % e, file=sys.stderr)
+        print("distiflow: %s" % e, file=sys.stderr)
         return e.code
     except profile.ProfileError as e:
         for line in e.errors:
@@ -143,7 +143,7 @@ def cmd_scan(args) -> int:
     # A typo must not turn the pre-commit scan into a silent pass.
     missing = [p for p in args.paths + ([args.deny_file] if args.deny_file else []) if not Path(p).exists()]
     if missing:
-        print("golden: no such path %s" % ", ".join(missing), file=sys.stderr)
+        print("distiflow: no such path %s" % ", ".join(missing), file=sys.stderr)
         return 2
     terms = scan.read_deny_file(Path(args.deny_file)) if args.deny_file else []
     hits = scan.scan_paths([Path(p) for p in args.paths], terms)
@@ -155,7 +155,7 @@ def cmd_scan(args) -> int:
 def _session(flag) -> str | None:
     sid = session.current_session(flag)
     if not sid:
-        print("golden: no session id", file=sys.stderr)
+        print("distiflow: no session id", file=sys.stderr)
     return sid
 
 
@@ -171,7 +171,7 @@ def cmd_task(args, flag) -> int:
         try:
             print(task.show(proj, args.id), end="")
         except (task.TaskError, state.StateError) as e:
-            print("golden: %s" % e, file=sys.stderr)
+            print("distiflow: %s" % e, file=sys.stderr)
             return 1
         return 0
     sid = _session(flag)
@@ -187,14 +187,14 @@ def cmd_task(args, flag) -> int:
             print(text, end="")
             return 0
         if args.sub == "takeover" and not args.confirm:
-            print("golden: taking over needs --confirm: golden task takeover %s --confirm" % args.id, file=sys.stderr)
+            print("distiflow: taking over needs --confirm: distiflow task takeover %s --confirm" % args.id, file=sys.stderr)
             return 2
         d = (task.resume if args.sub == "resume" else task.takeover)(root, proj, sid, args.id)
         print(task.resume_view(root, proj, d, sid), end="")
         return 0
     except (task.TaskError, state.StateError, ValueError) as e:
         for line in str(e).splitlines():
-            print("golden: " + line, file=sys.stderr)
+            print("distiflow: " + line, file=sys.stderr)
         return getattr(e, "code", 1)
     except profile.ProfileError as e:
         for line in e.errors:
@@ -214,7 +214,7 @@ def _holder_cmd(flag, fn) -> int:
         print(fn(paths.plugin_root(), proj, sid), end="")
     except (task.TaskError, state.StateError, ValueError) as e:
         for line in str(e).splitlines():
-            print("golden: " + line, file=sys.stderr)
+            print("distiflow: " + line, file=sys.stderr)
         return getattr(e, "code", 1)
     except profile.ProfileError as e:
         for line in e.errors:
@@ -256,20 +256,20 @@ def cmd_reopen(args, flag) -> int:
 
 def main(argv: list[str]) -> int:
     argv, flag = session.extract_session_flag(argv)
-    parser = argparse.ArgumentParser(prog="golden")
+    parser = argparse.ArgumentParser(prog="distiflow")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("whoami", help="print the session id golden sees")
+    sub.add_parser("whoami", help="print the session id distiflow sees")
     hook = sub.add_parser("hook", help="run a Claude Code hook")
     hook.add_argument("name")
     prof = sub.add_parser("profile", help="profile commands").add_subparsers(dest="sub", required=True)
-    prof.add_parser("check", help="validate .golden/profile.toml and profile.local.toml")
+    prof.add_parser("check", help="validate .distiflow/profile.toml and profile.local.toml")
     br = sub.add_parser("brief", help="print the brief for one stage")
     br.add_argument("--stage", required=True, choices=STAGES)
     br.add_argument("--kind", required=True)
-    ovr = sub.add_parser("override", help="copy an upstream file to .golden/overrides, or: override list")
+    ovr = sub.add_parser("override", help="copy an upstream file to .distiflow/overrides, or: override list")
     ovr.add_argument("target", help="path under core/, or 'list'")
     tk = sub.add_parser("task", help="start, list, resume or take over tasks").add_subparsers(dest="sub", required=True)
-    st = tk.add_parser("start", help="start a task: golden task start <kind> <description>")
+    st = tk.add_parser("start", help="start a task: distiflow task start <kind> <description>")
     st.add_argument("kind")
     st.add_argument("desc", nargs="*")
     st.add_argument("--link", action="append", help="display-only reference to a related task")
@@ -284,7 +284,7 @@ def main(argv: list[str]) -> int:
     nt.add_argument("what", choices=("decision", "open", "close"))
     nt.add_argument("text", nargs="+")
     gp = sub.add_parser("gate", help="record gate evidence").add_subparsers(dest="sub", required=True)
-    gpp = gp.add_parser("pass", help="golden gate pass <id> <gate> --evidence <text|@file>")
+    gpp = gp.add_parser("pass", help="distiflow gate pass <id> <gate> --evidence <text|@file>")
     gpp.add_argument("id")
     gpp.add_argument("gate")
     gpp.add_argument("--evidence", nargs="+", required=True)
@@ -313,7 +313,7 @@ def main(argv: list[str]) -> int:
     ck = sub.add_parser("check", help="check upstream content (default), for CI, a project's own files, or a release")
     ckm = ck.add_mutually_exclusive_group()
     ckm.add_argument("--ci", action="store_true", help="also leaks, glossary aliases, unknown terms, similarity")
-    ckm.add_argument("--local", action="store_true", help="format checks over .golden/overrides and .golden/practices")
+    ckm.add_argument("--local", action="store_true", help="format checks over .distiflow/overrides and .distiflow/practices")
     ckm.add_argument("--release", metavar="TAG", help="tag must match plugin.json, marketplace.json and CHANGELOG.md")
     ck.add_argument("--base", help="similarity report covers practices changed since this ref")
     sc = sub.add_parser("scan", help="scan files for leaks, project terms and hostile instructions")
@@ -326,7 +326,7 @@ def main(argv: list[str]) -> int:
     ini.add_argument("--allow-removal", action="store_true", help="let --write drop keys the saved profile has")
     sh = sub.add_parser("ship", help="hand off or finish a task in the ship stage")
     sh.add_argument("id")
-    sh.add_argument("--merged", action="store_true", help="confirm the merge when golden cannot see it")
+    sh.add_argument("--merged", action="store_true", help="confirm the merge when distiflow cannot see it")
     wt = sub.add_parser("worktree", help="working copy commands").add_subparsers(dest="sub", required=True)
     wt.add_parser("restore", help="re-add a deleted task working copy from its branch").add_argument("id")
     args = parser.parse_args(argv)
@@ -357,7 +357,7 @@ def main(argv: list[str]) -> int:
     if args.cmd == "whoami":
         sid = session.current_session(flag)
         if not sid:
-            print("golden: no session id", file=sys.stderr)
+            print("distiflow: no session id", file=sys.stderr)
             return 3
         print("session=%s source=%s" % (sid, "flag" if flag is not None else "env"))
         return 0

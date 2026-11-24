@@ -15,4 +15,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: python3 bin/golden check --release "$GITHUB_REF_NAME"
+      - run: python3 bin/distiflow check --release "$GITHUB_REF_NAME"

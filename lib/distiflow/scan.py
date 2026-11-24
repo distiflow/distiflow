@@ -5,7 +5,7 @@ import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
-from golden.worktree import git
+from distiflow.worktree import git
 
 
 @dataclass(frozen=True)

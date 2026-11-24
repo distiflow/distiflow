@@ -5,11 +5,11 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from golden import fsutil
-from golden.paths import version
-from golden.practices import Issue, Malformed, Practice, kinds, parse_practice
+from distiflow import fsutil
+from distiflow.paths import version
+from distiflow.practices import Issue, Malformed, Practice, kinds, parse_practice
 
-_HEADER = re.compile(r"(?:<!--|#) golden-override upstream=(\S+) version=(\S+)(?: -->)?$")
+_HEADER = re.compile(r"(?:<!--|#) distiflow-override upstream=(\S+) version=(\S+)(?: -->)?$")
 
 
 @dataclass
@@ -20,7 +20,7 @@ class Resolved:
 
 
 def override_dir(project: Path) -> Path:
-    return project / ".golden" / "overrides"
+    return project / ".distiflow" / "overrides"
 
 
 def sha256(path: Path) -> str:
@@ -92,16 +92,16 @@ def load_practices(root: Path, project: Path | None) -> tuple[list[Practice], li
     for rel in ("practices/" + r for r in _rels(override_dir(project) / "practices")):
         if not (root / "core" / rel).is_file():
             issues.append(override_status(rel, root, project)[1])
-    for rel in _rels(project / ".golden" / "practices"):
-        path = project / ".golden" / "practices" / rel
+    for rel in _rels(project / ".distiflow" / "practices"):
+        path = project / ".distiflow" / "practices" / rel
         if path.stem in upstream_ids:
-            issues.append(Issue("clash", path.stem, ".golden/practices/%s has the id of an upstream practice; "
-                                                    "use golden override to change it" % rel))
+            issues.append(Issue("clash", path.stem, ".distiflow/practices/%s has the id of an upstream practice; "
+                                                    "use distiflow override to change it" % rel))
             continue
         try:
             out.append(parse_practice(path, "local", known))
         except Malformed as e:
-            issues.append(Issue("malformed", ".golden/practices/" + rel, e.reason))
+            issues.append(Issue("malformed", ".distiflow/practices/" + rel, e.reason))
     return out, issues
 
 
@@ -119,7 +119,7 @@ def make_override(rel: str, root: Path, project: Path) -> Path:
         raise OverrideError("%s: no such upstream file" % rel)
     if upstream.suffix not in (".md", ".toml"):
         raise OverrideError("%s: only .md and .toml files can be overridden" % rel)
-    meta = "golden-override upstream=%s version=%s" % (sha256(upstream), version(root))
+    meta = "distiflow-override upstream=%s version=%s" % (sha256(upstream), version(root))
     line = "<!-- %s -->" % meta if upstream.suffix == ".md" else "# " + meta
     target = override_dir(project) / rel
     try:

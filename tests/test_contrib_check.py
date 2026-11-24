@@ -1,6 +1,6 @@
 import json
 
-from tests.helpers import GoldenCase, practice, w, write_profile
+from tests.helpers import DistiflowCase, practice, w, write_profile
 from tests.test_glossary_similar import CORPUS
 
 PROFILE = ('[project]\nname = "Zentrix"\ndeny_terms = ["quokka"]\n[commands]\ndeploy = "ssh deploy.zentrix.dev"\n'
@@ -9,7 +9,7 @@ NEAR = ("Before fixing, write a test that fails. Watch the test fail for the rig
         "Each tenant gets its own run; the tenant id is in the log.")
 
 
-class ContribCase(GoldenCase):
+class ContribCase(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root(practices={"plan/%s.md" % k: practice(k, ["plan"], body=v) for k, v in CORPUS.items()})
@@ -17,12 +17,12 @@ class ContribCase(GoldenCase):
         write_profile(self.proj, PROFILE)
 
     def c(self, *args, **kw):
-        return self.golden("contrib", *args, cwd=self.proj, root=self.root, **kw)
+        return self.distiflow("contrib", *args, cwd=self.proj, root=self.root, **kw)
 
     def draft(self, body=NEAR, slug="test-first-fix", pid="test-first-fix", **meta):
         r = self.c("new", *slug.split("-"))
         self.assertEqual(r.returncode, 0, r.stderr)
-        d = self.proj / ".golden/contrib" / slug
+        d = self.proj / ".distiflow/contrib" / slug
         w(d / "draft.md", practice(pid, meta.get("stages", ["plan"]), kinds=["fix"], body=body))
         return d
 
@@ -58,7 +58,7 @@ class ContribCheck(ContribCase):
         self.assertIn("secret", checks)
         r = self.c("confirm", "test-first-fix", "--verdict", "new")
         self.assertEqual(r.returncode, 1)
-        self.assertFalse((self.proj / ".golden/contrib/test-first-fix/confirmed.json").exists())
+        self.assertFalse((self.proj / ".distiflow/contrib/test-first-fix/confirmed.json").exists())
 
     def test_sensitive_kinds_never_survive(self):
         """S44: each sensitive kind is blocked by name, or rewritten away and listed; never left in sanitized.md."""
@@ -127,10 +127,10 @@ class ContribCheck(ContribCase):
         self.assertTrue(d.exists())
         self.assertEqual(self.c("discard", "test-first-fix", "--confirm").returncode, 0)
         self.assertFalse(d.exists())
-        w(self.proj / ".golden/x/draft.md", "outside the contrib folder")
+        w(self.proj / ".distiflow/x/draft.md", "outside the contrib folder")
         for slug in ("../x", "..", "A/b", "-rf"):
             with self.subTest(slug=slug):
                 r = self.c("check", slug)
                 self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
                 self.assertIn("not a contribution slug" if slug[0] != "-" else "error:", r.stderr)
-        self.assertFalse((self.proj / ".golden/x/sanitized.md").exists())
+        self.assertFalse((self.proj / ".distiflow/x/sanitized.md").exists())

@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from golden import fsutil, names
+from distiflow import fsutil, names
 
 
 class GitError(Exception):
@@ -34,11 +34,11 @@ def gh(*args: str, cwd: Path) -> subprocess.CompletedProcess | None:
 
 
 def path_for(project: Path, task_id: str) -> Path:
-    return project.parent / ("%s.golden" % project.name) / task_id
+    return project.parent / ("%s.distiflow" % project.name) / task_id
 
 
 def checkout_claim(project: Path) -> Path:
-    return project / ".golden" / "tasks" / "checkout.claim"
+    return project / ".distiflow" / "tasks" / "checkout.claim"
 
 
 def checkout_holder(project: Path) -> str | None:

@@ -7,8 +7,8 @@ import shutil
 import tomllib
 from pathlib import Path
 
-from golden import fsutil, glossary, names, overlay, profile, scan, similar, worktree
-from golden.practices import _check, kinds, split_frontmatter
+from distiflow import fsutil, glossary, names, overlay, profile, scan, similar, worktree
+from distiflow.practices import _check, kinds, split_frontmatter
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 CHECKS = ("format", "size", "leaks", "hostile", "glossary-alias")
@@ -28,9 +28,9 @@ def folder(project: Path, slug: str, must_exist: bool = True) -> Path:
     # The slug becomes a path: only the slug alphabet may reach the filesystem.
     if not SLUG.fullmatch(slug):
         raise ContribError("not a contribution slug: %r" % slug, 2)
-    d = project / ".golden" / "contrib" / slug
+    d = project / ".distiflow" / "contrib" / slug
     if must_exist and not d.is_dir():
-        raise ContribError("no contribution %s; start one with golden contrib new <idea>" % slug)
+        raise ContribError("no contribution %s; start one with distiflow contrib new <idea>" % slug)
     return d
 
 
@@ -38,10 +38,10 @@ def new(project: Path, idea: str) -> str:
     slug = names.slug(idea)
     d = folder(project, slug, must_exist=False)
     if d.is_dir():
-        return "draft exists: %s; continue it or golden contrib discard %s --confirm\n" % (d, slug)
+        return "draft exists: %s; continue it or distiflow contrib discard %s --confirm\n" % (d, slug)
     d.mkdir(parents=True)
     fsutil.atomic_write(d / "idea.txt", idea + "\n")
-    return "write the practice draft to %s, then run golden contrib check %s\n" % (d / "draft.md", slug)
+    return "write the practice draft to %s, then run distiflow contrib check %s\n" % (d / "draft.md", slug)
 
 
 def upstream_practices(root: Path) -> dict[str, Path]:
@@ -107,11 +107,11 @@ def confirm(root: Path, project: Path, slug: str, verdict: str) -> str:
     try:
         chk = json.loads((d / "check.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        raise ContribError("not checked; run golden contrib check %s" % slug) from None
+        raise ContribError("not checked; run distiflow contrib check %s" % slug) from None
     if not chk.get("passed"):
-        raise ContribError("the last check failed; fix the draft and run golden contrib check %s" % slug)
+        raise ContribError("the last check failed; fix the draft and run distiflow contrib check %s" % slug)
     if chk.get("sha256") != sha256(d / "sanitized.md"):
-        raise ContribError("sanitized.md changed after check; run golden contrib check %s again" % slug)
+        raise ContribError("sanitized.md changed after check; run distiflow contrib check %s again" % slug)
     kind, _, pid = verdict.partition(":")
     if kind == "duplicate":
         raise ContribError("duplicate of %s; nothing to send" % pid)
@@ -170,7 +170,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
     try:
         conf = json.loads((d / "confirmed.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        raise ContribError("not confirmed; run golden contrib confirm %s --verdict new|extends:<id>" % slug, 2) from None
+        raise ContribError("not confirmed; run distiflow contrib confirm %s --verdict new|extends:<id>" % slug, 2) from None
     data = (d / "sanitized.md").read_bytes()
     if hashlib.sha256(data).hexdigest() != conf["sha256"]:
         raise ContribError("sanitized.md changed after confirm; check and confirm again")
@@ -184,9 +184,9 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
         auth = worktree.gh("auth", "status", cwd=project)
         if auth is None or auth.returncode != 0:
             raise ContribError("GitHub sign-in missing: install gh and run gh auth login, then rerun "
-                               "golden contrib send %s" % slug, 3)
+                               "distiflow contrib send %s" % slug, 3)
     url, repo = _upstream(root)
-    wc = Path.home() / ".golden" / "upstream"
+    wc = Path.home() / ".distiflow" / "upstream"
     target, pid = conf["target"], Path(conf["target"]).stem
     msg = ("feat(practices): add %s" if conf["verdict"] == "new" else "docs(practices): extend %s") % pid
     # --update is user input that reaches git: only an existing contribution branch name is accepted.
@@ -227,7 +227,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
         if not set(changed) <= {target} or blob.returncode != 0 or blob.stdout.encode("utf-8") != data:
             raise ContribError("the work clone holds more than the confirmed change; nothing pushed")
         if not push:
-            return ("this project does not let golden push; hand off with:\n"
+            return ("this project does not let distiflow push; hand off with:\n"
                     "git -C %s push -u origin %s\ngh pr create --repo %s --head %s --base main --title \"%s\"\n"
                     % (wc, branch, repo, branch, msg))
         perm = worktree.gh("api", "repos/" + repo, "--jq", ".permissions.push", cwd=wc)
@@ -238,7 +238,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
             r = worktree.gh("issue", "create", "--repo", repo, "--title", "Practice idea: %s" % pid,
                             "--body-file", str(d / "sanitized.md"), cwd=wc)
             if r.returncode != 0:
-                raise ContribError("gh issue create failed; rerun golden contrib send %s --issue" % slug)
+                raise ContribError("gh issue create failed; rerun distiflow contrib send %s --issue" % slug)
             link = r.stdout.strip().splitlines()[-1]
             fsutil.atomic_write(d / "sent.json", json.dumps({"issue": link, "sha256": conf["sha256"]}))
             return link + "\n"
@@ -250,11 +250,11 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
         if r.returncode == 0 and r.stdout.strip():
             out = "updated %s\n" % r.stdout.strip()
         else:
-            fsutil.atomic_write(d / "pr-body.md", "%s\n\nSent with golden contrib.\n" % msg)
+            fsutil.atomic_write(d / "pr-body.md", "%s\n\nSent with distiflow contrib.\n" % msg)
             r = worktree.gh("pr", "create", "--repo", repo, "--head", branch, "--base", "main", "--title", msg,
                             "--body-file", str(d / "pr-body.md"), cwd=wc)
             if r.returncode != 0:
-                raise ContribError("branch pushed, but gh pr create failed; rerun golden contrib send %s" % slug)
+                raise ContribError("branch pushed, but gh pr create failed; rerun distiflow contrib send %s" % slug)
             out = r.stdout.strip().splitlines()[-1] + "\n"
     except worktree.GitError as e:
         raise ContribError("git: %s" % e) from None

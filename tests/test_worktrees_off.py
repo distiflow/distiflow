@@ -25,7 +25,7 @@ class WorktreesOff(WorktreeCase):
         r = self.ok("task", "abandon", a, "--confirm", session="s-1")
         self.assertIn("changes left in the main checkout on feat/task-a_%s" % a, r.stdout)
         self.assertTrue((self.proj / "dirty.txt").exists())
-        self.assertFalse((self.proj / ".golden/tasks/checkout.claim").exists())
+        self.assertFalse((self.proj / ".distiflow/tasks/checkout.claim").exists())
         self.assertEqual(self.st(a)["status"], "abandoned")
 
     def test_failed_switch_releases_checkout(self):
@@ -35,7 +35,7 @@ class WorktreesOff(WorktreeCase):
         r = self.advance_to(tid, "implement")
         self.assertEqual(r.returncode, 1)
         self.assertEqual(self.st(tid)["stage"], "plan")
-        self.assertFalse((self.proj / ".golden/tasks/checkout.claim").exists())
+        self.assertFalse((self.proj / ".distiflow/tasks/checkout.claim").exists())
 
     def test_ship_releases_checkout(self):
         """T11 S15: a shipped task gives the shared checkout back to the next task."""
@@ -62,7 +62,7 @@ class WorktreesOff(WorktreeCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("?? work.txt", r.stderr)
         self.assertEqual(self.st(tid)["status"], "active")
-        self.assertTrue((self.proj / ".golden/tasks/checkout.claim").exists())
+        self.assertTrue((self.proj / ".distiflow/tasks/checkout.claim").exists())
 
     def test_parallel_enter_one_wins(self):
         """T11 R22: two tasks entering implement at once, exactly one gets the checkout."""

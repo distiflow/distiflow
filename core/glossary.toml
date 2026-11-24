@@ -25,7 +25,7 @@ definition = "The text a stage starts from: stage instructions, loaded practices
 aliases = []
 
 [terms."profile"]
-definition = "The project's committed settings in .golden/profile.toml, plus an optional personal layer."
+definition = "The project's committed settings in .distiflow/profile.toml, plus an optional personal layer."
 aliases = []
 
 [terms."override"]

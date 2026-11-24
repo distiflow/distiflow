@@ -3,9 +3,9 @@ import os
 import tomllib
 from pathlib import Path
 
-from golden import fsutil, glossary, scan, similar
-from golden.practices import STAGES, Malformed, kinds, parse_practice
-from golden.worktree import git
+from distiflow import fsutil, glossary, scan, similar
+from distiflow.practices import STAGES, Malformed, kinds, parse_practice
+from distiflow.worktree import git
 
 
 def _limit(core: Path) -> int:
@@ -99,12 +99,12 @@ def check_ci(root: Path, base: str | None) -> tuple[list[str], list[str], str]:
 
 def check_local(root: Path, project: Path) -> list[str]:
     """Format checks for a project's own overrides and practices; leak and alias checks guard upstream only."""
-    golden, errs = project / ".golden", []
+    distiflow, errs = project / ".distiflow", []
     rel = lambda f: f.relative_to(project).as_posix()
-    files = _md(golden / "overrides" / "practices") + _md(golden / "practices")
+    files = _md(distiflow / "overrides" / "practices") + _md(distiflow / "practices")
     _practices(files, rel, _known_kinds(root), _limit(root / "core"), errs)
-    _hostile(files + _md(golden / "overrides" / "stages"), rel, errs)
-    for f in sorted((golden / "overrides").glob("*.toml")):
+    _hostile(files + _md(distiflow / "overrides" / "stages"), rel, errs)
+    for f in sorted((distiflow / "overrides").glob("*.toml")):
         try:
             tomllib.loads(f.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as e:

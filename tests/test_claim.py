@@ -4,13 +4,13 @@ from unittest import mock
 import threading
 import time
 
-from tests.helpers import GoldenCase, practice, write_profile
+from tests.helpers import DistiflowCase, practice, write_profile
 
 N = 8
 STALE = 1800
 
 
-class ClaimCase(GoldenCase):
+class ClaimCase(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.root = self.fixture_root(practices={"understand/g.md": practice("g", ["understand"], gate=True)})
@@ -18,12 +18,12 @@ class ClaimCase(GoldenCase):
         write_profile(self.proj)
 
     def run_all(self, argvs):
-        """Start every golden process at the same instant; threads only launch, the racers are processes."""
+        """Start every distiflow process at the same instant; threads only launch, the racers are processes."""
         barrier, out = threading.Barrier(len(argvs)), [None] * len(argvs)
 
         def go(i, session, args):
             barrier.wait()
-            out[i] = self.golden(*args, cwd=self.proj, root=self.root, session=session)
+            out[i] = self.distiflow(*args, cwd=self.proj, root=self.root, session=session)
 
         ts = [threading.Thread(target=go, args=(i, s, a)) for i, (s, a) in enumerate(argvs)]
         for t in ts:
@@ -33,9 +33,9 @@ class ClaimCase(GoldenCase):
         return out
 
     def start(self, session="s-1"):
-        r = self.golden("task", "start", "feature", "add", "login", cwd=self.proj, root=self.root, session=session)
+        r = self.distiflow("task", "start", "feature", "add", "login", cwd=self.proj, root=self.root, session=session)
         self.assertEqual(r.returncode, 0, r.stderr)
-        return sorted((self.proj / ".golden/tasks").iterdir())[-1]
+        return sorted((self.proj / ".distiflow/tasks").iterdir())[-1]
 
     def holder(self, task):
         return json.loads((task / "claim").read_text())["session"]
@@ -50,10 +50,10 @@ class ClaimRace(ClaimCase):
         """T5 I3 S31 R18: parallel starts get distinct ids, each claimed by its own starter."""
         for rnd in range(5):
             with self.subTest(round=rnd):
-                before = set((self.proj / ".golden/tasks").glob("T-*")) if rnd else set()
+                before = set((self.proj / ".distiflow/tasks").glob("T-*")) if rnd else set()
                 rs = self.run_all([("s-%d" % i, ("task", "start", "feature", "x")) for i in range(N)])
                 self.assertEqual([r.returncode for r in rs], [0] * N, [r.stderr for r in rs])
-                new = set((self.proj / ".golden/tasks").glob("T-*")) - before
+                new = set((self.proj / ".distiflow/tasks").glob("T-*")) - before
                 self.assertEqual(len(new), N)
                 self.assertEqual(sorted(self.holder(t) for t in new), sorted("s-%d" % i for i in range(N)))
 
@@ -91,7 +91,7 @@ class ClaimRace(ClaimCase):
         """T6 R20: the old holder's heartbeat never takes the claim back or rewrites it."""
         task = self.start("s-1")
         self.age(task, STALE + 1)
-        r = self.golden("task", "takeover", task.name, "--confirm", cwd=self.proj, root=self.root, session="s-2")
+        r = self.distiflow("task", "takeover", task.name, "--confirm", cwd=self.proj, root=self.root, session="s-2")
         self.assertEqual(r.returncode, 0, r.stderr)
         before = (task / "claim").read_text()
         self.age(task, 100)
@@ -106,21 +106,21 @@ class ClaimRace(ClaimCase):
         """T6 R24: a claim exactly at the limit is held; one second past it is stale."""
         task = self.start("s-1")
         self.age(task, STALE)
-        r = self.golden("task", "resume", task.name, cwd=self.proj, root=self.root, session="s-2")
+        r = self.distiflow("task", "resume", task.name, cwd=self.proj, root=self.root, session="s-2")
         self.assertEqual(r.returncode, 1, r.stderr)
         self.assertIn("is held by s-1", r.stderr)
         self.age(task, STALE + 1)
-        r = self.golden("task", "resume", task.name, cwd=self.proj, root=self.root, session="s-2")
+        r = self.distiflow("task", "resume", task.name, cwd=self.proj, root=self.root, session="s-2")
         self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn("take over with: golden task takeover %s --confirm" % task.name, r.stderr)
+        self.assertIn("take over with: distiflow task takeover %s --confirm" % task.name, r.stderr)
         self.assertEqual(self.holder(task), "s-1")
 
     def test_takeover_without_confirm_or_fresh_refused(self):
         """S34: takeover needs --confirm and a stale claim."""
         task = self.start("s-1")
-        r = self.golden("task", "takeover", task.name, cwd=self.proj, root=self.root, session="s-2")
+        r = self.distiflow("task", "takeover", task.name, cwd=self.proj, root=self.root, session="s-2")
         self.assertEqual(r.returncode, 2)
-        r = self.golden("task", "takeover", task.name, "--confirm", cwd=self.proj, root=self.root, session="s-2")
+        r = self.distiflow("task", "takeover", task.name, "--confirm", cwd=self.proj, root=self.root, session="s-2")
         self.assertEqual(r.returncode, 1)
         self.assertIn("not stale", r.stderr)
         self.assertEqual((self.holder(task), list(task.glob("claim.lost.*"))), ("s-1", []))
@@ -129,7 +129,7 @@ class ClaimRace(ClaimCase):
         """S31: two tasks side by side, each with its holder; a silent one is marked stale."""
         a, b = self.start("s-1"), self.start("s-2")
         self.age(b, STALE + 1)
-        r = self.golden("task", "list", cwd=self.proj, root=self.root, session=None)
+        r = self.distiflow("task", "list", cwd=self.proj, root=self.root, session=None)
         self.assertEqual(r.returncode, 0, r.stderr)
         lines = r.stdout.splitlines()
         self.assertRegex(lines[0], r"^%s  understand  active  held by s-1 since \S+$" % a.name)
@@ -139,7 +139,7 @@ class ClaimRace(ClaimCase):
 class TakeoverWindow(ClaimCase):
     def test_takeover_never_steals_a_fresh_claim(self):
         """T6 I3 I2: a claim renewed between the stale check and the link is not taken."""
-        from golden import claim
+        from distiflow import claim
         task = self.start("s-1")
         self.age(task, STALE + 1)
         real = claim.is_stale
@@ -163,8 +163,8 @@ class TakeoverWindow(ClaimCase):
         (task / "claim").unlink()
         for cmd in (("resume", task.name), ("takeover", task.name, "--confirm")):
             with self.subTest(cmd=cmd[0]):
-                r = self.golden("task", *cmd, cwd=self.proj, root=self.root, session="s-2")
+                r = self.distiflow("task", *cmd, cwd=self.proj, root=self.root, session="s-2")
                 self.assertEqual(r.returncode, 1)
-                self.assertIn("update golden", r.stderr)
+                self.assertIn("update distiflow", r.stderr)
                 self.assertNotIn("Traceback", r.stderr)
                 self.assertFalse((task / "claim").exists())

@@ -2,8 +2,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from golden import brief, claim, fsutil, overlay, paths, profile, state, worktree
-from golden.practices import STAGES
+from distiflow import brief, claim, fsutil, overlay, paths, profile, state, worktree
+from distiflow.practices import STAGES
 
 
 class TaskError(Exception):
@@ -15,7 +15,7 @@ class TaskError(Exception):
 
 
 def tasks_dir(project: Path) -> Path:
-    return project / ".golden" / "tasks"
+    return project / ".distiflow" / "tasks"
 
 
 def stale_after(root: Path, project: Path) -> float:
@@ -46,15 +46,15 @@ def _new_id(project: Path) -> Path:
 
 
 def start(root: Path, project: Path, session: str, kind: str, desc: str, links: list[str]) -> tuple[Path, str]:
-    if not (project / ".golden" / profile.COMMITTED).is_file():
-        raise TaskError("no golden profile; run /golden:init")
+    if not (project / ".distiflow" / profile.COMMITTED).is_file():
+        raise TaskError("no distiflow profile; run /distiflow:init")
     try:
         brief.build_brief(root, project, "understand", kind)
         prof, _ = profile.load_for(root, project, overlay.load_practices(root, project)[0])
     except brief.UnknownKind as e:
         raise TaskError(str(e), 2) from None
     if not desc:
-        raise TaskError("a description is required: golden task start <kind> <description>", 2)
+        raise TaskError("a description is required: distiflow task start <kind> <description>", 2)
     d = _new_id(project)
     claim.claim(d, session)
     text, sel = brief.build_brief(root, project, "understand", kind, task_id=d.name)
@@ -90,11 +90,11 @@ def _readable(d: Path) -> None:
 
 def resume(root: Path, project: Path, session: str, task_id: str) -> Path:
     d = task_dir(project, task_id)
-    _readable(d)  # never claim a task this golden cannot read
+    _readable(d)  # never claim a task this distiflow cannot read
     h = claim.holder(d)
     if h is not None and h["session"] != session:
         if claim.is_stale(d, stale_after(root, project)):
-            raise TaskError("task %s is held by %s, silent since %s; take over with: golden task takeover %s --confirm"
+            raise TaskError("task %s is held by %s, silent since %s; take over with: distiflow task takeover %s --confirm"
                             % (task_id, h["session"], _iso(time_of(d)), task_id), 2)
         raise TaskError("task %s is held by %s since %s" % (task_id, h["session"], h.get("since", "?")))
     if h is None:
@@ -215,7 +215,7 @@ def _open_run(root: Path, project: Path, st: dict, stage: str, session: str, car
     st["stage"] = stage
     fsutil.atomic_write(task_dir(project, st["id"]) / ("stage-%d-brief.md" % (STAGES.index(stage) + 1)), text)
     if version != prev:
-        text += "\ngolden %s → %s\n%s\n" % (prev, version, changelog_between(root, prev, version))
+        text += "\ndistiflow %s → %s\n%s\n" % (prev, version, changelog_between(root, prev, version))
     return text
 
 
@@ -224,7 +224,7 @@ def advance(root: Path, project: Path, session: str, task_id: str) -> str:
 
     def apply(st):
         if st["stage"] == "ship":
-            raise TaskError("ship is the last stage; run golden ship %s" % task_id)
+            raise TaskError("ship is the last stage; run distiflow ship %s" % task_id)
         run = st["runs"][-1]
         failing = [g for g in run["gates"] if g["id"] not in run["evidence"]]
         if failing:
@@ -239,7 +239,7 @@ def advance(root: Path, project: Path, session: str, task_id: str) -> str:
         out.append(_open_run(root, project, st, nxt, session, carry=True) + note)
 
     _mutate(task_dir(project, task_id), session, apply)
-    return out[0] + "\nstart a fresh session: /golden:task resume %s\n" % task_id
+    return out[0] + "\nstart a fresh session: /distiflow:task resume %s\n" % task_id
 
 
 def _git_conf(root: Path, project: Path) -> dict:
@@ -286,18 +286,18 @@ def ship(root: Path, project: Path, session: str, task_id: str, merged: bool) ->
             handoff = ("git push -u origin %s\ngh pr create --head %s --base %s\n" % (branch, branch, conf["base"]))
             if conf["push"] == "forbidden":
                 _set_status(d, session, "awaiting-merge")
-                return "this project does not let golden push; hand off with:\n" + handoff
+                return "this project does not let distiflow push; hand off with:\n" + handoff
             url = worktree.push_and_request(project, branch, conf["base"])
             _set_status(d, session, "awaiting-merge")
             if url is None:
                 raise TaskError("branch pushed; gh is missing or signed out. Open the request with:\n" + handoff, 3)
-            return "%s\nawaiting merge; run golden ship %s again after it is merged\n" % (url, task_id)
+            return "%s\nawaiting merge; run distiflow ship %s again after it is merged\n" % (url, task_id)
         if st["mode"] == "worktree":
             try:
                 worktree.remove(project, wc)
             except worktree.GitError as e:
                 _set_status(d, session, "cleanup-pending")
-                raise TaskError("cleanup pending: %s; retry with golden ship %s" % (e, task_id)) from None
+                raise TaskError("cleanup pending: %s; retry with distiflow ship %s" % (e, task_id)) from None
         else:
             worktree.release_checkout(project, task_id)
     except worktree.GitError as e:
@@ -312,7 +312,7 @@ def abandon(root: Path, project: Path, session: str, task_id: str, confirm: bool
     dirty = worktree.porcelain(wc) if wc else ""
     listing = "uncommitted changes in %s:\n%s\n" % (wc, dirty) if dirty else "no uncommitted changes\n"
     if not confirm:
-        raise TaskError(listing + "nothing removed; abandon with: golden task abandon %s --confirm" % task_id, 2)
+        raise TaskError(listing + "nothing removed; abandon with: distiflow task abandon %s --confirm" % task_id, 2)
     out = listing
     if st["worktree"]:
         try:
@@ -365,7 +365,7 @@ def show(project: Path, task_id: str) -> str:
     out += ["- " + x["text"] for x in st["decisions"]] or ["- none"]
     out += ["open items:"] + (["- " + x for x in _open(st)] or ["- none"])
     for run in st["runs"]:
-        out.append("run %s %d · golden %s · %s · %s → %s" % (run["stage"], run["n"], run["version"], run["session"],
+        out.append("run %s %d · distiflow %s · %s · %s → %s" % (run["stage"], run["n"], run["version"], run["session"],
                                                          run["started"], run["ended"] or "open"))
         for g in run["gates"]:
             ev = run["evidence"].get(g["id"])
@@ -387,7 +387,7 @@ def resume_view(root: Path, project: Path, d: Path, session: str) -> str:
     passed = sorted((ev["at"], gid, ev["text"]) for r in st["runs"] for gid, ev in r["evidence"].items())
     last = "%s (%s)" % (passed[-1][1], _first_line(passed[-1][2])) if passed else "none"
     pending = [g["id"] for g in run["gates"] if g["id"] not in run["evidence"]]
-    rel = Path(".golden", "tasks", d.name, "stage-%d-brief.md" % n)
+    rel = Path(".distiflow", "tasks", d.name, "stage-%d-brief.md" % n)
     out = ["stage %d/6 %s (%s)" % (n, st["stage"], status),
            "last passed gate: " + last,
            "pending gates: " + (", ".join(pending) or "none"),
@@ -395,7 +395,7 @@ def resume_view(root: Path, project: Path, d: Path, session: str) -> str:
            "decisions: " + (" · ".join(x["text"] for x in st["decisions"]) or "none"),
            "brief: " + rel.as_posix()]
     if st["worktree"] and not Path(st["worktree"]).exists():
-        out.append("working copy missing: %s; restore with golden worktree restore %s" % (st["worktree"], st["id"]))
+        out.append("working copy missing: %s; restore with distiflow worktree restore %s" % (st["worktree"], st["id"]))
     if not (project / rel).is_file():
         text, _ = brief.build_brief(root, project, st["stage"], st["kind"], task_id=st["id"])
         fsutil.atomic_write(project / rel, text)

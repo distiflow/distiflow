@@ -1,6 +1,6 @@
 import tomllib
 
-from tests.helpers import KINDS, REPO, GoldenCase, header, practice, sha_of, w, write_profile
+from tests.helpers import KINDS, REPO, DistiflowCase, header, practice, sha_of, w, write_profile
 
 EMPHASIS = {k: v["emphasis"] for k, v in tomllib.loads((REPO / "core/kinds.toml").read_text())["kinds"].items()}
 
@@ -9,9 +9,9 @@ def section(out, name):
     return out.split("## " + name + "\n", 1)[1].split("\n## ", 1)[0]
 
 
-class Brief(GoldenCase):
+class Brief(DistiflowCase):
     def brief(self, root, proj, stage="plan", kind="feature"):
-        return self.golden("brief", "--stage", stage, "--kind", kind, cwd=proj, root=root)
+        return self.distiflow("brief", "--stage", stage, "--kind", kind, cwd=proj, root=root)
 
     def setup(self, practices=None, profile=None):
         root = self.fixture_root(practices=practices or {})
@@ -38,23 +38,23 @@ class Brief(GoldenCase):
     def test_local_practice_marked_local(self):
         """S21: a project practice loads and is marked local."""
         root, proj = self.setup()
-        w(proj / ".golden/practices/plan/l.md", practice("l", ["plan"]))
+        w(proj / ".distiflow/practices/plan/l.md", practice("l", ["plan"]))
         loaded = section(self.brief(root, proj).stdout, "Practices loaded")
         self.assertRegex(loaded, r"- l · cheap · \d+ tok · local")
 
     def test_malformed_local_skipped_with_reason(self):
         """S22: a broken local practice is skipped with its file and reason; the brief still renders."""
         root, proj = self.setup()
-        w(proj / ".golden/practices/plan/bad.md", "junk\n")
+        w(proj / ".distiflow/practices/plan/bad.md", "junk\n")
         r = self.brief(root, proj)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("- .golden/practices/plan/bad.md: malformed: missing +++ frontmatter",
+        self.assertIn("- .distiflow/practices/plan/bad.md: malformed: missing +++ frontmatter",
                       section(r.stdout, "Not loaded"))
 
     def test_clash_reported(self):
         """S23: a local practice with an upstream id is reported, and upstream stays loaded."""
         root, proj = self.setup({"plan/a.md": practice("a", ["plan"], body="UP")})
-        w(proj / ".golden/practices/plan/a.md", practice("a", ["plan"], body="LOCAL"))
+        w(proj / ".distiflow/practices/plan/a.md", practice("a", ["plan"], body="LOCAL"))
         out = self.brief(root, proj).stdout
         self.assertIn("- a: clash:", section(out, "Not loaded"))
         self.assertIn("UP", section(out, "Practices loaded"))
@@ -64,7 +64,7 @@ class Brief(GoldenCase):
         """S60 S61: an override is marked, and an upstream change warns by name."""
         rel = "practices/plan/a.md"
         root, proj = self.setup({"plan/a.md": practice("a", ["plan"], body="v1")})
-        w(proj / ".golden/overrides" / rel, header(sha_of(root, rel)) + practice("a", ["plan"], body="mine"))
+        w(proj / ".distiflow/overrides" / rel, header(sha_of(root, rel)) + practice("a", ["plan"], body="mine"))
         out = self.brief(root, proj).stdout
         self.assertRegex(section(out, "Practices loaded"), r"- a · cheap · \d+ tok · overridden")
         self.assertNotIn("changed upstream", out)
@@ -74,12 +74,12 @@ class Brief(GoldenCase):
     def test_swapped_stage_keeps_gates(self):
         """S27: replacing a stage's text never removes its gates."""
         root, proj = self.setup({"plan/g.md": practice("g", ["plan"], gate=True, evidence="plan reviewed")})
-        w(proj / ".golden/overrides/stages/plan.md", header(sha_of(root, "stages/plan.md")) + "My own plan stage.\n")
+        w(proj / ".distiflow/overrides/stages/plan.md", header(sha_of(root, "stages/plan.md")) + "My own plan stage.\n")
         out = self.brief(root, proj).stdout
         stage = section(out, "Stage")
         self.assertIn("(overridden locally)", stage)
         self.assertIn("My own plan stage.", stage)
-        self.assertNotIn("golden-override", stage)
+        self.assertNotIn("distiflow-override", stage)
         self.assertIn("- g: plan reviewed", section(out, "Gates"))
         w(root / "core/stages/plan.md", "Upstream rewrote the plan stage.\n")
         self.assertIn("stages/plan.md changed upstream", section(self.brief(root, proj).stdout, "Warnings"))
@@ -112,4 +112,4 @@ class Brief(GoldenCase):
         root, proj = self.setup()
         r = self.brief(root, proj, kind="refactor")
         self.assertEqual(r.returncode, 2)
-        self.assertIn("golden: unknown kind refactor (one of feature, fix, debug, perf, ux)", r.stderr)
+        self.assertIn("distiflow: unknown kind refactor (one of feature, fix, debug, perf, ux)", r.stderr)

@@ -2,8 +2,8 @@ import random
 import unittest
 from pathlib import Path
 
-from golden.practices import STAGES, Issue, Practice
-from golden.selection import select
+from distiflow.practices import STAGES, Issue, Practice
+from distiflow.selection import select
 
 
 def P(id, stages=("plan",), pr=50, cost="cheap", gate=False, tokens=10, kinds=None, signals=None):
@@ -60,10 +60,10 @@ class Selection(unittest.TestCase):
 
     def test_issues_reported_as_dropped(self):
         """S22 S23: a malformed or clashing local practice is named with its reason, not silently lost."""
-        issues = [Issue("malformed", ".golden/practices/plan/x.md", "missing +++ frontmatter"),
+        issues = [Issue("malformed", ".distiflow/practices/plan/x.md", "missing +++ frontmatter"),
                   Issue("clash", "a", "same id as upstream"), Issue("drift", "practices/plan/b.md", "changed")]
         s = select("plan", "feature", {}, [], issues, LIMITS)
-        self.assertEqual(dict(s.dropped), {".golden/practices/plan/x.md": "malformed: missing +++ frontmatter",
+        self.assertEqual(dict(s.dropped), {".distiflow/practices/plan/x.md": "malformed: missing +++ frontmatter",
                                            "a": "clash: same id as upstream"})
 
     def test_same_inputs_same_output(self):

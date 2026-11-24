@@ -5,7 +5,7 @@ import shutil
 from tests.helpers import w, write_profile
 from tests.test_contrib_check import NEAR, PROFILE, ContribCase
 
-REPO_URL = "https://github.com/o/golden-workflow"
+REPO_URL = "https://github.com/o/distiflow"
 OTHER = "Split the plan into small steps that can each be checked on its own, one at a time, in order."
 
 
@@ -26,7 +26,7 @@ class SendCase(ContribCase):
         self.git("clone", "-q", "--bare", str(seed), str(self.bare), cwd=self.tmp)
         with open(self.home / ".gitconfig", "a") as f:
             f.write('[url "%s"]\n\tinsteadOf = %s\n' % (self.bare, REPO_URL))
-        self.clone = self.home / ".golden" / "upstream"
+        self.clone = self.home / ".distiflow" / "upstream"
 
     def ready(self, slug="test-first-fix", body=NEAR, verdict="new"):
         self.draft(body=body, slug=slug, pid=slug)
@@ -34,7 +34,7 @@ class SendCase(ContribCase):
         self.assertEqual(r.returncode, 0, r.stdout)
         r = self.c("confirm", slug, "--verdict", verdict)
         self.assertEqual(r.returncode, 0, r.stderr)
-        return self.proj / ".golden/contrib" / slug
+        return self.proj / ".distiflow/contrib" / slug
 
     def contrib_refs(self):
         return self.git("ls-remote", str(self.bare), "refs/heads/contrib/*", cwd=self.tmp).splitlines()
@@ -138,7 +138,7 @@ class Idempotent(SendCase):  # T21 I12 S46 S48 R23
         self.ready()
         r = self.c("send", "test-first-fix")
         self.assertEqual(r.returncode, 1)
-        self.assertIn("rerun golden contrib send test-first-fix", r.stderr)
+        self.assertIn("rerun distiflow contrib send test-first-fix", r.stderr)
         self.assertEqual(self.c("send", "test-first-fix").returncode, 0)
         self.assertEqual((len(self.gh_state()["prs"]), len(self.contrib_refs())), (1, 1))
 
@@ -173,7 +173,7 @@ class Failures(SendCase):  # T22 S47 S50 S51
                 self.assertEqual(r.returncode, code, r.stdout + r.stderr)
                 self.assertIn(text, r.stderr)
                 self.assertEqual((self.contrib_refs(), self.gh_state()["prs"]), ([], []))
-                self.assertTrue((self.proj / ".golden/contrib/test-first-fix/sanitized.md").exists())
+                self.assertTrue((self.proj / ".distiflow/contrib/test-first-fix/sanitized.md").exists())
                 if name == "gh missing":
                     self.assertEqual(self.c("send", "test-first-fix").returncode, 0)
                 self.doCleanups()
@@ -185,7 +185,7 @@ class Failures(SendCase):  # T22 S47 S50 S51
         r = self.c("send", "test-first-fix", "--issue")
         self.assertEqual(r.returncode, 0, r.stderr)
         [issue] = self.gh_state()["issues"]
-        self.assertEqual((issue["body"], issue["repo"]), ((d / "sanitized.md").read_text(), "o/golden-workflow"))
+        self.assertEqual((issue["body"], issue["repo"]), ((d / "sanitized.md").read_text(), "o/distiflow"))
         self.assertEqual(self.contrib_refs(), [])
 
 

@@ -1,4 +1,4 @@
-# Numeric limits. A project changes them through .golden/overrides/limits.toml.
+# Numeric limits. A project changes them through .distiflow/overrides/limits.toml.
 
 [claim]
 stale_after_seconds = 1800

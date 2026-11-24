@@ -1,13 +1,13 @@
 import re
 
-from golden.practices import STAGES
-from tests.helpers import KINDS, REPO, GoldenCase, write_profile
+from distiflow.practices import STAGES
+from tests.helpers import KINDS, REPO, DistiflowCase, write_profile
 
 SECTIONS = ("## Stages", "## Stage", "## Practices loaded", "## Not loaded", "## Gates", "## Models", "## Warnings")
 STAGE_PARTS = ("### Purpose", "### Do", "### Roles", "### Record", "### Exit")
 
 
-class RealCore(GoldenCase):
+class RealCore(DistiflowCase):
     def test_stage_text_shape(self):
         """S10 S27: every stage file has its five parts in order, fits 120 lines, and ends with the exit commands."""
         for stage in STAGES:
@@ -22,10 +22,10 @@ class RealCore(GoldenCase):
                 self.assertIsNone(re.search(r"^## ", text, re.M), "## would split the brief's sections")
                 exit_part = text.split("### Exit", 1)[1]
                 if stage == "ship":
-                    self.assertIn("golden ship", exit_part)
+                    self.assertIn("distiflow ship", exit_part)
                 else:
-                    self.assertIn("golden gate pass", exit_part)
-                    self.assertIn("golden advance", exit_part)
+                    self.assertIn("distiflow gate pass", exit_part)
+                    self.assertIn("distiflow advance", exit_part)
 
     def test_ship_never_pushes_against_profile_or_merges(self):
         """I14: the ship text tells the session never to push when the profile forbids it, and never to merge."""
@@ -40,12 +40,12 @@ class RealCore(GoldenCase):
         for kind in KINDS:
             for stage in STAGES:
                 with self.subTest(kind=kind, stage=stage):
-                    r = self.golden("brief", "--stage", stage, "--kind", kind, cwd=proj)
+                    r = self.distiflow("brief", "--stage", stage, "--kind", kind, cwd=proj)
                     self.assertEqual(r.returncode, 0, r.stderr)
                     self.assertTrue(r.stdout.startswith("# ad-hoc · %s · stage" % kind))
                     for s in SECTIONS:
                         self.assertIn("\n%s\n" % s, r.stdout)
-        r = self.golden("check", "--ci", cwd=REPO)
+        r = self.distiflow("check", "--ci", cwd=REPO)
         self.assertEqual(r.returncode, 0, r.stdout)
 
 
@@ -66,12 +66,12 @@ KIND_ROWS = [
 ]
 
 
-class RealCoreKinds(GoldenCase):
+class RealCoreKinds(DistiflowCase):
     def test_real_core_kind_gates(self):
         """T20 S8: each kind gets its own gates from the seed practices; nothing drops for token budget."""
         proj = self.repo()
         write_profile(proj)
-        brief = lambda k, s: self.golden("brief", "--stage", s, "--kind", k, cwd=proj).stdout
+        brief = lambda k, s: self.distiflow("brief", "--stage", s, "--kind", k, cwd=proj).stdout
         for kind, stage, gates, loaded in KIND_ROWS:
             with self.subTest(kind=kind, stage=stage):
                 out = brief(kind, stage)

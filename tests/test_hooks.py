@@ -1,6 +1,6 @@
 import json
 
-from tests.helpers import GoldenCase, w
+from tests.helpers import DistiflowCase, w
 
 # (name, setup, target, tool, expected) — T7 I4 S35 R33; each row builds files directly, then runs the hook.
 GUARD_ROWS = [
@@ -16,10 +16,10 @@ GUARD_ROWS = [
     ("never held",                     "none", "worktree/file.py", "Write", "allow"),
     ("corrupt claim",                  "corrupt", "worktree/file.py", "Write", "allow"),
     ("corrupt state",                  "corrupt-state", "worktree/file.py", "Write", "allow"),
-    ("no golden project",              "nogolden", "elsewhere/x.py", "Write", "allow"),   # Review Focus 5
+    ("no distiflow project",              "nodistiflow", "elsewhere/x.py", "Write", "allow"),   # Review Focus 5
     ("not a git dir",                  "nogit", "plain", "Bash", "allow"),
 ]
-LOST_MSG = "you no longer hold task T-1; resume it with /golden:task resume T-1"
+LOST_MSG = "you no longer hold task T-1; resume it with /distiflow:task resume T-1"
 
 
 def state(stage="implement", runs=1, worktree=None):
@@ -28,20 +28,20 @@ def state(stage="implement", runs=1, worktree=None):
                       "ended": None, "gates": [], "evidence": {}} for n in range(runs)]}
 
 
-class Hooks(GoldenCase):
+class Hooks(DistiflowCase):
     def setUp(self):
         super().setUp()
         self.proj = self.repo()  # under the "gw tmp ü" parent: Review Focus 4
-        self.wt = self.tmp / "proj.golden" / "T-1"
+        self.wt = self.tmp / "proj.distiflow" / "T-1"
         (self.wt / "sub").mkdir(parents=True)
-        w(self.wt / ".golden" / "profile.toml", "")  # the committed profile is checked out in every worktree
-        self.task = self.proj / ".golden" / "tasks" / "T-1"
+        w(self.wt / ".distiflow" / "profile.toml", "")  # the committed profile is checked out in every worktree
+        self.task = self.proj / ".distiflow" / "tasks" / "T-1"
 
     def claim(self, session):
         w(self.task / "claim", json.dumps({"session": session, "nonce": "n2", "since": "t"}))
 
     def build(self, setup):
-        if setup in ("nogolden", "nogit"):
+        if setup in ("nodistiflow", "nogit"):
             (self.tmp / "plain").mkdir()
             return
         w(self.task / "state.json", "{" if setup == "corrupt-state" else json.dumps(state(worktree=str(self.wt))))
@@ -56,7 +56,7 @@ class Hooks(GoldenCase):
         if setup in ("lost", "lost+checkout", "lost+corrupt-other", "corrupt", "corrupt-state"):
             w(self.task / "claim.lost.s-1.n1", "{}")
         if setup == "lost+checkout":
-            w(self.proj / ".golden" / "tasks" / "checkout.claim", json.dumps({"task": "T-1", "session": "s-2"}))
+            w(self.proj / ".distiflow" / "tasks" / "checkout.claim", json.dumps({"task": "T-1", "session": "s-2"}))
 
     def path(self, target):
         head, _, rest = target.partition("/")
@@ -97,7 +97,7 @@ class Hooks(GoldenCase):
         alias = self.tmp.parent / ("alias-" + self.tmp.name)
         alias.symlink_to(self.tmp)
         self.addCleanup(alias.unlink)
-        p = alias / "proj.golden" / "T-1" / "file.py"
+        p = alias / "proj.distiflow" / "T-1" / "file.py"
         r = self.hook("guard", {"session_id": "s-1", "cwd": str(alias / "proj"), "tool_name": "Write",
                                 "tool_input": {"file_path": str(p)}})
         self.assert_decision(r, "deny", LOST_MSG)
@@ -114,7 +114,7 @@ class Hooks(GoldenCase):
 
     def test_guard_survives_garbage_stdin(self):
         """R33 Review Focus 5: a hook never blocks on input it cannot read."""
-        r = self.golden("hook", "guard", cwd=self.proj, stdin="not json")
+        r = self.distiflow("hook", "guard", cwd=self.proj, stdin="not json")
         self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
 
     def spawn(self, session="s-1", prompt="look around"):
@@ -135,7 +135,7 @@ class Hooks(GoldenCase):
             self.assert_decision(self.spawn(), "allow")
         self.assert_decision(self.spawn(), "deny", "budget-approved:")
 
-    def test_agent_cap_outside_golden_allows(self):
+    def test_agent_cap_outside_distiflow_allows(self):
         """Review Focus 5: no project, or a corrupt task, never blocks a spawn."""
         w(self.task / "state.json", "{")
         self.claim("s-1")

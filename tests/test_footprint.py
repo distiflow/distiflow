@@ -10,11 +10,11 @@ class Footprint(WorktreeCase):
 
     def stray(self, before, after):
         changed = {p for p in after if before.get(p) != after[p]} | (set(before) - set(after))
-        allowed = (self.proj / ".golden", self.tmp / "proj.golden", self.proj / ".git", self.bare, self.gh_dir)
+        allowed = (self.proj / ".distiflow", self.tmp / "proj.distiflow", self.proj / ".git", self.bare, self.gh_dir)
         return sorted(str(p.relative_to(self.tmp)) for p in changed if not any(p.is_relative_to(a) for a in allowed))
 
     def test_footprint_full_lifecycle(self):
-        """T29 R53: a whole task writes only in .golden/, the worktree dir, git's own dirs, the remote and gh."""
+        """T29 R53: a whole task writes only in .distiflow/, the worktree dir, git's own dirs, the remote and gh."""
         before = self.snapshot()
         tid = self.start()
         self.ok("gate", "pass", tid, "g", "--evidence", "ok")

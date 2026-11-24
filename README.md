@@ -1,4 +1,4 @@
-# golden
+# distiflow
 
 A Claude Code plugin that runs every task through six stages — understand, plan, implement, verify,
 review, ship — with practices selected by the task's kind and the project's signals, gates that need
@@ -8,8 +8,8 @@ task state, and a sanitizing flow to send a lesson back upstream.
 ## Install
 
 ```
-/plugin marketplace add <owner>/golden-workflow
-/plugin install golden@golden-workflow
+/plugin marketplace add distiflow/distiflow
+/plugin install distiflow@distiflow
 ```
 
 Needs Python 3.11 or newer and git. `gh` is needed only to open change requests.
@@ -18,30 +18,30 @@ Needs Python 3.11 or newer and git. `gh` is needed only to open change requests.
 
 | Slash command | What it does |
 |---|---|
-| `/golden:init` | Propose a project profile and write it after you confirm each part |
-| `/golden:task <kind?> <description>` | Start a task (kinds: feature, fix, debug, perf, ux) |
-| `/golden:task resume <id>` · `list` · `abandon <id>` | Continue, list or drop tasks |
-| `/golden:override <path>` | Make a local override of an upstream stage, practice or TOML file |
-| `/golden:contribute <idea>` | Send a generic practice upstream as a change request |
+| `/distiflow:init` | Propose a project profile and write it after you confirm each part |
+| `/distiflow:task <kind?> <description>` | Start a task (kinds: feature, fix, debug, perf, ux) |
+| `/distiflow:task resume <id>` · `list` · `abandon <id>` | Continue, list or drop tasks |
+| `/distiflow:override <path>` | Make a local override of an upstream stage, practice or TOML file |
+| `/distiflow:contribute <idea>` | Send a generic practice upstream as a change request |
 
-The CLI behind them is `golden` (`bin/golden`): `task`, `note`, `gate pass`, `advance`,
+The CLI behind them is `distiflow` (`bin/distiflow`): `task`, `note`, `gate pass`, `advance`,
 `stage reopen`, `ship`, `worktree restore`, `brief`, `profile check`, `override`, `init`, `contrib`,
 `check`, `scan`. Exit codes: 0 ok, 1 refused, 2 needs confirmation, 3 environment missing.
 
 ## Project layout
 
 ```
-.golden/
+.distiflow/
   profile.toml          committed project profile (signals, commands, git, glossary, gates)
   profile.local.toml    personal layer, ignored by git; cannot change gates
   overrides/            local copies of upstream files, each recording the upstream hash
   practices/            project-only practices
   tasks/<id>/           task state, claim, brief snapshots, spec, plan, reviews (ignored)
   contrib/<slug>/       contribution drafts (ignored)
-<repo>.golden/<id>/     the working copy of a task in the implement stage
+<repo>.distiflow/<id>/     the working copy of a task in the implement stage
 ```
 
-Golden writes only inside `.golden/`, `<repo>.golden/` and `~/.golden/upstream`.
+Distiflow writes only inside `.distiflow/`, `<repo>.distiflow/` and `~/.distiflow/upstream`.
 
 ## License
 

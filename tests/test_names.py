@@ -2,7 +2,7 @@ import re
 import subprocess
 import unittest
 
-from golden import names
+from distiflow import names
 
 INPUTS = ["Fix login", "../../etc", "-rf --force", "Виправити вхід", "!!!", "a" * 200, "feat/x..y", "x@{y}",
           "Ünïcödé ok", "", "   ", ".lock", "a.lock", "HEAD"]

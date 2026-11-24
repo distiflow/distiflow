@@ -4,14 +4,14 @@ import shutil
 from pathlib import Path
 from unittest import mock
 
-from golden import fsutil, state
-from tests.helpers import REPO, GoldenCase
+from distiflow import fsutil, state
+from tests.helpers import REPO, DistiflowCase
 
 FIXTURE = REPO / "tests" / "fixtures" / "state_schema1.json"
 WRITER = re.compile(r"""write_text\(|write_bytes\(|open\([^)]*['"][wax]|os\.open\(""")
 
 
-class State(GoldenCase):
+class State(DistiflowCase):
     def task_dir(self, data=None):
         d = self.tmp / "T-1"
         d.mkdir()
@@ -20,7 +20,7 @@ class State(GoldenCase):
         return d
 
     def test_reads_checked_in_schema1_fixture(self):
-        """T13 I11 R47: a newer golden reads state written by schema 1."""
+        """T13 I11 R47: a newer distiflow reads state written by schema 1."""
         d = self.task_dir()
         shutil.copy(FIXTURE, d / "state.json")
         st = state.load(d)
@@ -34,16 +34,16 @@ class State(GoldenCase):
         self.assertEqual((st["decisions"], st["open_items"], st["links"], st["status"]), ([], [], [], "active"))
 
     def test_newer_schema_refused_with_update_message(self):
-        """T13 I11 R48: an older golden refuses state from a newer one, by name."""
+        """T13 I11 R48: an older distiflow refuses state from a newer one, by name."""
         with self.assertRaises(state.StateError) as cm:
             state.load(self.task_dir({"schema": 2, "id": "T-9"}))
-        self.assertIn("task T-9 was written by a newer golden (schema 2); update golden", str(cm.exception))
+        self.assertIn("task T-9 was written by a newer distiflow (schema 2); update distiflow", str(cm.exception))
 
     def test_atomic_write_leaves_old_or_new(self):
         """T13 I11: a writer killed before the replace leaves the old content and no temp file."""
         target = self.tmp / "state.json"
         target.write_text("old")
-        with mock.patch("golden.fsutil.os.replace", side_effect=OSError("killed")):
+        with mock.patch("distiflow.fsutil.os.replace", side_effect=OSError("killed")):
             with self.assertRaises(OSError):
                 fsutil.atomic_write(target, "new")
         self.assertEqual(target.read_text(), "old")
@@ -109,9 +109,9 @@ class State(GoldenCase):
         self.assertEqual(overlap, [])
 
     def test_single_writer_sweep(self):
-        """T13 F6: fsutil.py is the only module that opens golden files for writing."""
+        """T13 F6: fsutil.py is the only module that opens distiflow files for writing."""
         hits = []
-        for f in sorted((REPO / "lib" / "golden").rglob("*.py")):
+        for f in sorted((REPO / "lib" / "distiflow").rglob("*.py")):
             if f.name == "fsutil.py":
                 continue
             for n, line in enumerate(f.read_text().splitlines(), 1):

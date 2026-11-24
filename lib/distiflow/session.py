@@ -17,5 +17,5 @@ def extract_session_flag(argv: list[str]) -> tuple[list[str], str | None]:
 
 
 def current_session(flag: str | None) -> str | None:
-    sid = flag if flag is not None else os.environ.get("GOLDEN_SESSION_ID")
+    sid = flag if flag is not None else os.environ.get("DISTIFLOW_SESSION_ID")
     return sid if sid and VALID_ID.fullmatch(sid) else None
