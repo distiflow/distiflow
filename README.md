@@ -9,7 +9,7 @@ Requires Python 3.11 or newer and git. Standard library only.
 Install:
 
 ```
-/plugin install golden --marketplace <owner>/golden-workflow
+/plugin install golden --marketplace luckymelon257/golden-workflow
 ```
 
 Status: early development (0.1.0). Usage docs arrive with the skills.
