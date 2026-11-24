@@ -98,6 +98,10 @@ def cmd_task(args, flag) -> int:
             _, text = task.start(root, proj, sid, args.kind, " ".join(args.desc), args.link or [])
             print(text, end="")
             return 0
+        if args.sub == "abandon":
+            text = task.abandon(root, proj, sid, args.id, args.confirm)
+            print(text, end="")
+            return 0
         if args.sub == "takeover" and not args.confirm:
             print("golden: taking over needs --confirm: golden task takeover %s --confirm" % args.id, file=sys.stderr)
             return 2
@@ -105,7 +109,8 @@ def cmd_task(args, flag) -> int:
         print(task.resume_view(root, proj, d, sid), end="")
         return 0
     except (task.TaskError, state.StateError, ValueError) as e:
-        print("golden: %s" % e, file=sys.stderr)
+        for line in str(e).splitlines():
+            print("golden: " + line, file=sys.stderr)
         return getattr(e, "code", 1)
     except profile.ProfileError as e:
         for line in e.errors:
@@ -153,6 +158,14 @@ def cmd_advance(args, flag) -> int:
     return _holder_cmd(flag, lambda root, proj, sid: task.advance(root, proj, sid, args.id))
 
 
+def cmd_ship(args, flag) -> int:
+    return _holder_cmd(flag, lambda root, proj, sid: task.ship(root, proj, sid, args.id, args.merged))
+
+
+def cmd_restore(args, flag) -> int:
+    return _holder_cmd(flag, lambda root, proj, sid: task.restore(root, proj, sid, args.id))
+
+
 def cmd_reopen(args, flag) -> int:
     return _holder_cmd(flag, lambda root, proj, sid: task.reopen(root, proj, sid, args.id, args.stage, args.recheck))
 
@@ -177,10 +190,10 @@ def main(argv: list[str]) -> int:
     st.add_argument("desc", nargs="*")
     st.add_argument("--link", action="append", help="display-only reference to a related task")
     tk.add_parser("list", help="list tasks and who holds them")
-    for name in ("resume", "takeover", "show"):
+    for name in ("resume", "takeover", "show", "abandon"):
         p = tk.add_parser(name)
         p.add_argument("id")
-        if name == "takeover":
+        if name in ("takeover", "abandon"):
             p.add_argument("--confirm", action="store_true")
     nt = sub.add_parser("note", help="record a decision, open an item or close one")
     nt.add_argument("id")
@@ -198,6 +211,11 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
+    sh = sub.add_parser("ship", help="hand off or finish a task in the ship stage")
+    sh.add_argument("id")
+    sh.add_argument("--merged", action="store_true", help="confirm the merge when golden cannot see it")
+    wt = sub.add_parser("worktree", help="working copy commands").add_subparsers(dest="sub", required=True)
+    wt.add_parser("restore", help="re-add a deleted task working copy from its branch").add_argument("id")
     args = parser.parse_args(argv)
 
     if args.cmd == "profile":
@@ -210,8 +228,9 @@ def main(argv: list[str]) -> int:
         return cmd_task(args, flag)
     if args.cmd == "note":
         return cmd_note(args, flag)
-    if args.cmd in ("gate", "advance", "stage"):
-        return {"gate": cmd_gate, "advance": cmd_advance, "stage": cmd_reopen}[args.cmd](args, flag)
+    if args.cmd in ("gate", "advance", "stage", "ship", "worktree"):
+        return {"gate": cmd_gate, "advance": cmd_advance, "stage": cmd_reopen, "ship": cmd_ship,
+                "worktree": cmd_restore}[args.cmd](args, flag)
     if args.cmd == "hook":
         return hooks.run(args.name)
     if args.cmd == "whoami":

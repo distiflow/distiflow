@@ -115,6 +115,19 @@ class GoldenCase(unittest.TestCase):
             w(root / "CHANGELOG.md", changelog)
         return root
 
+    def gh_stub(self, auth="ok", push="true", merged="", fail=""):
+        """Put a recording GitHub CLI stand-in first on PATH; a real gh is never reached."""
+        stub = self.tmp / "bin" / "gh"
+        stub.write_text("#!%s\nexec(open(%r).read())\n" % (sys.executable, str(REPO / "tests/fixtures/gh_stub.py")))
+        stub.chmod(0o755)
+        self.gh_dir = self.tmp / "gh"
+        self.env.update(GH_STUB_DIR=str(self.gh_dir), GH_STUB_AUTH=auth, GH_STUB_PUSH=push,
+                        GH_STUB_MERGED=merged, GH_STUB_FAIL=fail)
+
+    def gh_state(self):
+        f = self.gh_dir / "state.json"
+        return json.loads(f.read_text()) if f.exists() else {"prs": [], "issues": []}
+
     def repo(self, name="proj"):
         r = self.tmp / name
         r.mkdir()

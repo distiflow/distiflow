@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from golden import brief, claim, fsutil, overlay, paths, profile, state
+from golden import brief, claim, fsutil, overlay, paths, profile, state, worktree
 from golden.practices import STAGES
 
 
@@ -229,10 +229,113 @@ def advance(root: Path, project: Path, session: str, task_id: str) -> str:
         failing = [g for g in run["gates"] if g["id"] not in run["evidence"]]
         if failing:
             raise TaskError("\n".join("failing gate: %s (%s)" % (g["id"], g["evidence_wanted"]) for g in failing))
-        out.append(_open_run(root, project, st, STAGES[STAGES.index(st["stage"]) + 1], session, carry=False))
+        nxt = STAGES[STAGES.index(st["stage"]) + 1]
+        note = ""
+        if nxt == "implement":
+            try:
+                note = worktree.enter_implement(project, st, _git_conf(root, project), session)
+            except (worktree.GitError, ValueError) as e:
+                raise TaskError(str(e)) from None
+        out.append(_open_run(root, project, st, nxt, session, carry=False) + note)
 
     _mutate(task_dir(project, task_id), session, apply)
     return out[0] + "\nstart a fresh session: /golden:task resume %s\n" % task_id
+
+
+def _git_conf(root: Path, project: Path) -> dict:
+    return profile.load_for(root, project, overlay.load_practices(root, project)[0])[0]["git"]
+
+
+def _held(project: Path, session: str, task_id: str) -> tuple[Path, dict]:
+    d = task_dir(project, task_id)
+    _readable(d)
+    if not claim.holds(d, session):
+        raise TaskError("you do not hold task %s" % task_id)
+    return d, state.load(d)
+
+
+def _finish(d: Path, session: str, status: str) -> None:
+    def apply(st):
+        st["status"] = status
+        if st["runs"][-1]["ended"] is None:
+            st["runs"][-1]["ended"] = state.now()
+    _mutate(d, session, apply)
+    claim.release(d, session)
+
+
+def _set_status(d: Path, session: str, status: str) -> None:
+    _mutate(d, session, lambda st: st.update(status=status))
+
+
+def ship(root: Path, project: Path, session: str, task_id: str, merged: bool) -> str:
+    d = task_dir(project, task_id)
+    _readable(d)
+    if state.load(d)["status"] == "done":
+        return "task %s is already done\n" % task_id
+    d, st = _held(project, session, task_id)
+    if st["stage"] != "ship":
+        raise TaskError("task %s is at stage %s; ship comes after review" % (task_id, st["stage"]))
+    conf, branch = _git_conf(root, project), st["branch"]
+    wc = Path(st["worktree"]) if st["worktree"] else project
+    try:
+        if not worktree.is_merged(project, branch, conf["base"], merged):
+            dirty = worktree.porcelain(wc)
+            if dirty:
+                raise TaskError("uncommitted changes in %s; commit them before ship:\n%s" % (wc, dirty))
+            handoff = ("git push -u origin %s\ngh pr create --head %s --base %s\n" % (branch, branch, conf["base"]))
+            if conf["push"] == "forbidden":
+                _set_status(d, session, "awaiting-merge")
+                return "this project does not let golden push; hand off with:\n" + handoff
+            url = worktree.push_and_request(project, wc, branch, conf["base"])
+            _set_status(d, session, "awaiting-merge")
+            if url is None:
+                raise TaskError("branch pushed; gh is missing or signed out. Open the request with:\n" + handoff, 3)
+            return "%s\nawaiting merge; run golden ship %s again after it is merged\n" % (url, task_id)
+        if st["mode"] == "worktree":
+            try:
+                worktree.remove(project, wc)
+            except worktree.GitError as e:
+                _set_status(d, session, "cleanup-pending")
+                raise TaskError("cleanup pending: %s; retry with golden ship %s" % (e, task_id)) from None
+        else:
+            worktree.release_checkout(project, task_id)
+    except worktree.GitError as e:
+        raise TaskError(str(e)) from None
+    _finish(d, session, "done")
+    return "task %s shipped and cleaned up\n" % task_id
+
+
+def abandon(root: Path, project: Path, session: str, task_id: str, confirm: bool) -> str:
+    d, st = _held(project, session, task_id)
+    wc = Path(st["worktree"]) if st["worktree"] else (project if st["branch"] else None)
+    dirty = worktree.porcelain(wc) if wc else ""
+    listing = "uncommitted changes in %s:\n%s\n" % (wc, dirty) if dirty else "no uncommitted changes\n"
+    if not confirm:
+        raise TaskError(listing + "nothing removed; abandon with: golden task abandon %s --confirm" % task_id, 2)
+    out = listing
+    if st["worktree"]:
+        try:
+            worktree.remove(project, Path(st["worktree"]), force=True)
+        except worktree.GitError as e:
+            raise TaskError(str(e)) from None
+    elif st["branch"]:
+        # The main checkout is shared: never delete work there, only let go of it.
+        worktree.release_checkout(project, task_id)
+        out += "changes left in the main checkout on %s\n" % st["branch"]
+    _finish(d, session, "abandoned")
+    return out + "task %s abandoned\n" % task_id
+
+
+def restore(root: Path, project: Path, session: str, task_id: str) -> str:
+    d, st = _held(project, session, task_id)
+    if not st["worktree"]:
+        raise TaskError("task %s has no working copy to restore" % task_id)
+    path = Path(st["worktree"])
+    try:
+        worktree.restore(project, path, st["branch"])
+    except worktree.GitError as e:
+        raise TaskError(str(e)) from None
+    return "restored %s on %s; uncommitted work in the old copy is gone\n" % (path, st["branch"])
 
 
 def reopen(root: Path, project: Path, session: str, task_id: str, stage: str, recheck: bool) -> str:
@@ -290,6 +393,8 @@ def resume_view(root: Path, project: Path, d: Path, session: str) -> str:
            "open items: " + (" · ".join(_open(st)) or "none"),
            "decisions: " + (" · ".join(x["text"] for x in st["decisions"]) or "none"),
            "brief: " + rel.as_posix()]
+    if st["worktree"] and not Path(st["worktree"]).exists():
+        out.append("working copy missing: %s; restore with golden worktree restore %s" % (st["worktree"], st["id"]))
     if not (project / rel).is_file():
         text, _ = brief.build_brief(root, project, st["stage"], st["kind"], task_id=st["id"])
         fsutil.atomic_write(project / rel, text)
