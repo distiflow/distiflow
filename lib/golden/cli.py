@@ -36,6 +36,27 @@ def cmd_profile_check(args) -> int:
     return 0
 
 
+def cmd_override(args) -> int:
+    proj = _project()
+    if proj is None:
+        return 3
+    root = paths.plugin_root()
+    if args.target == "list":
+        rows = overlay.list_overrides(root, proj)
+        for rel, status in rows:
+            print("%s %s" % (rel, status))
+        if not rows:
+            print("no overrides")
+        return 0
+    try:
+        target = overlay.make_override(args.target, root, proj)
+    except overlay.OverrideError as e:
+        print("golden: " + str(e), file=sys.stderr)
+        return 1
+    print("wrote %s; edit it, the header records the upstream it shadows" % target.relative_to(proj))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     argv, flag = session.extract_session_flag(argv)
     parser = argparse.ArgumentParser(prog="golden")
@@ -45,10 +66,14 @@ def main(argv: list[str]) -> int:
     hook.add_argument("name")
     prof = sub.add_parser("profile", help="profile commands").add_subparsers(dest="sub", required=True)
     prof.add_parser("check", help="validate .golden/profile.toml and profile.local.toml")
+    ovr = sub.add_parser("override", help="copy an upstream file to .golden/overrides, or: override list")
+    ovr.add_argument("target", help="path under core/, or 'list'")
     args = parser.parse_args(argv)
 
     if args.cmd == "profile":
         return cmd_profile_check(args)
+    if args.cmd == "override":
+        return cmd_override(args)
     if args.cmd == "hook":
         return hooks.run(args.name)
     if args.cmd == "whoami":

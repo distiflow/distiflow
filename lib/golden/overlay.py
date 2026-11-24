@@ -1,9 +1,12 @@
 import hashlib
+import posixpath
 import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from golden import fsutil
+from golden.paths import version
 from golden.practices import Issue, Malformed, Practice, kinds, parse_practice
 
 _HEADER = re.compile(r"(?:<!--|#) golden-override upstream=(\S+) version=(\S+)(?: -->)?$")
@@ -100,3 +103,33 @@ def load_practices(root: Path, project: Path | None) -> tuple[list[Practice], li
         except Malformed as e:
             issues.append(Issue("malformed", ".golden/practices/" + rel, e.reason))
     return out, issues
+
+
+class OverrideError(Exception):
+    pass
+
+
+def make_override(rel: str, root: Path, project: Path) -> Path:
+    core = (root / "core").resolve()
+    if (not rel or rel.startswith("/") or posixpath.normpath(rel) != rel or ".." in rel.split("/")
+            or not (core / rel).resolve().is_relative_to(core)):
+        raise OverrideError("%s: not a path under core/" % rel)
+    upstream = core / rel
+    if not upstream.is_file():
+        raise OverrideError("%s: no such upstream file" % rel)
+    if upstream.suffix not in (".md", ".toml"):
+        raise OverrideError("%s: only .md and .toml files can be overridden" % rel)
+    meta = "golden-override upstream=%s version=%s" % (sha256(upstream), version(root))
+    line = "<!-- %s -->" % meta if upstream.suffix == ".md" else "# " + meta
+    target = override_dir(project) / rel
+    try:
+        fsutil.create_exclusive(target, line + "\n" + upstream.read_text(encoding="utf-8"))
+    except FileExistsError:
+        raise OverrideError("%s: override already exists at %s" % (rel, target)) from None
+    return target
+
+
+def list_overrides(root: Path, project: Path) -> list[tuple[str, str]]:
+    base = override_dir(project)
+    rels = sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file()) if base.is_dir() else []
+    return [(rel, override_status(rel, root, project)[0]) for rel in rels]
