@@ -113,7 +113,8 @@ def cmd_task(args, flag) -> int:
         return 1
 
 
-def cmd_note(args, flag) -> int:
+def _holder_cmd(flag, fn) -> int:
+    """Run fn(root, project, session) -> text for a command that writes task state."""
     proj = _project()
     if proj is None:
         return 3
@@ -121,12 +122,39 @@ def cmd_note(args, flag) -> int:
     if not sid:
         return 3
     try:
-        task.note(proj, sid, args.id, args.what, " ".join(args.text))
-    except task.TaskError as e:
-        print("golden: %s" % e, file=sys.stderr)
+        print(fn(paths.plugin_root(), proj, sid), end="")
+    except (task.TaskError, state.StateError, ValueError) as e:
+        for line in str(e).splitlines():
+            print("golden: " + line, file=sys.stderr)
+        return getattr(e, "code", 1)
+    except profile.ProfileError as e:
+        for line in e.errors:
+            print(line, file=sys.stderr)
         return 1
-    print("noted")
     return 0
+
+
+def cmd_note(args, flag) -> int:
+    def run(root, proj, sid):
+        task.note(proj, sid, args.id, args.what, " ".join(args.text))
+        return "noted\n"
+    return _holder_cmd(flag, run)
+
+
+def cmd_gate(args, flag) -> int:
+    def run(root, proj, sid):
+        text = task.read_evidence(" ".join(args.evidence), Path.cwd())
+        task.pass_gate(proj, sid, args.id, args.gate, text)
+        return "gate %s passed\n" % args.gate
+    return _holder_cmd(flag, run)
+
+
+def cmd_advance(args, flag) -> int:
+    return _holder_cmd(flag, lambda root, proj, sid: task.advance(root, proj, sid, args.id))
+
+
+def cmd_reopen(args, flag) -> int:
+    return _holder_cmd(flag, lambda root, proj, sid: task.reopen(root, proj, sid, args.id, args.stage, args.recheck))
 
 
 def main(argv: list[str]) -> int:
@@ -158,6 +186,18 @@ def main(argv: list[str]) -> int:
     nt.add_argument("id")
     nt.add_argument("what", choices=("decision", "open", "close"))
     nt.add_argument("text", nargs="+")
+    gp = sub.add_parser("gate", help="record gate evidence").add_subparsers(dest="sub", required=True)
+    gpp = gp.add_parser("pass", help="golden gate pass <id> <gate> --evidence <text|@file>")
+    gpp.add_argument("id")
+    gpp.add_argument("gate")
+    gpp.add_argument("--evidence", nargs="+", required=True)
+    adv = sub.add_parser("advance", help="move a task to its next stage once every gate has evidence")
+    adv.add_argument("id")
+    stg = sub.add_parser("stage", help="stage commands").add_subparsers(dest="sub", required=True)
+    ro = stg.add_parser("reopen", help="run an earlier stage again")
+    ro.add_argument("id")
+    ro.add_argument("stage", choices=STAGES)
+    ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
     args = parser.parse_args(argv)
 
     if args.cmd == "profile":
@@ -170,6 +210,8 @@ def main(argv: list[str]) -> int:
         return cmd_task(args, flag)
     if args.cmd == "note":
         return cmd_note(args, flag)
+    if args.cmd in ("gate", "advance", "stage"):
+        return {"gate": cmd_gate, "advance": cmd_advance, "stage": cmd_reopen}[args.cmd](args, flag)
     if args.cmd == "hook":
         return hooks.run(args.name)
     if args.cmd == "whoami":

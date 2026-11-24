@@ -136,10 +136,115 @@ def note(project: Path, session: str, task_id: str, what: str, text: str) -> Non
                 raise TaskError("no open item %s in task %s" % (text, task_id))
             item["closed_at"] = state.now()
 
+    _mutate(d, session, apply)
+
+
+def _mutate(d: Path, session: str, fn) -> dict:
     try:
-        state.mutate(d, session, apply)
+        return state.mutate(d, session, fn)
     except state.StateError as e:
         raise TaskError(str(e)) from None
+
+
+EVIDENCE_MAX = 20000
+
+
+def read_evidence(arg: str, cwd: Path) -> str:
+    text = arg
+    if arg.startswith("@"):
+        try:
+            text = (cwd / arg[1:]).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            raise TaskError("cannot read evidence file %s: %s" % (arg[1:], e)) from None
+        if len(text) > EVIDENCE_MAX:
+            raise TaskError("evidence file %s is over %d characters" % (arg[1:], EVIDENCE_MAX))
+    if not text.strip():
+        raise TaskError("evidence is empty", 2)
+    return text
+
+
+def pass_gate(project: Path, session: str, task_id: str, gate: str, text: str) -> None:
+    def apply(st):
+        run = st["runs"][-1]
+        # Only the running stage's snapshot counts: no evidence for another stage or a gate added later.
+        if gate not in [g["id"] for g in run["gates"]]:
+            raise TaskError("gate %s is not a gate of stage %s" % (gate, st["stage"]))
+        run["evidence"][gate] = {"text": text, "at": state.now(), "session": session, "carried_from": None}
+
+    _mutate(task_dir(project, task_id), session, apply)
+
+
+def _version_key(v: str) -> tuple:
+    return tuple(int(x) for x in v.split("."))
+
+
+def changelog_between(root: Path, old: str, new: str) -> str:
+    """CHANGELOG.md sections for versions in (old, new]."""
+    try:
+        text = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    keep, out = False, []
+    for line in text.splitlines():
+        if line.startswith("## ["):
+            try:
+                v = _version_key(line[4:line.index("]")])
+                keep = _version_key(old) < v <= _version_key(new)
+            except ValueError:
+                keep = False
+        if keep:
+            out.append(line)
+    return "\n".join(out).strip()
+
+
+def _open_run(root: Path, project: Path, st: dict, stage: str, session: str, carry: bool) -> str:
+    """Append a run of stage with a fresh gate snapshot and brief; returns the text to print."""
+    text, sel = brief.build_brief(root, project, stage, st["kind"], task_id=st["id"])
+    version, prev = paths.version(root), st["runs"][-1]["version"]
+    gates = [{"id": g.id, "evidence_wanted": g.evidence} for g in sel.gates]
+    run = state.new_run(stage, 1 + sum(r["stage"] == stage for r in st["runs"]), version, session, gates)
+    earlier = next((r for r in reversed(st["runs"]) if r["stage"] == stage), None)
+    if carry and earlier:
+        for g in gates:
+            ev = earlier["evidence"].get(g["id"])
+            if ev:
+                run["evidence"][g["id"]] = {**ev, "carried_from": ev.get("carried_from") or earlier["n"]}
+    if st["runs"][-1]["ended"] is None:
+        st["runs"][-1]["ended"] = state.now()
+    st["runs"].append(run)
+    st["stage"] = stage
+    fsutil.atomic_write(task_dir(project, st["id"]) / ("stage-%d-brief.md" % (STAGES.index(stage) + 1)), text)
+    if version != prev:
+        text += "\ngolden %s → %s\n%s\n" % (prev, version, changelog_between(root, prev, version))
+    return text
+
+
+def advance(root: Path, project: Path, session: str, task_id: str) -> str:
+    out = []
+
+    def apply(st):
+        if st["stage"] == "ship":
+            raise TaskError("ship is the last stage; run golden ship %s" % task_id)
+        run = st["runs"][-1]
+        failing = [g for g in run["gates"] if g["id"] not in run["evidence"]]
+        if failing:
+            raise TaskError("\n".join("failing gate: %s (%s)" % (g["id"], g["evidence_wanted"]) for g in failing))
+        out.append(_open_run(root, project, st, STAGES[STAGES.index(st["stage"]) + 1], session, carry=False))
+
+    _mutate(task_dir(project, task_id), session, apply)
+    return out[0] + "\nstart a fresh session: /golden:task resume %s\n" % task_id
+
+
+def reopen(root: Path, project: Path, session: str, task_id: str, stage: str, recheck: bool) -> str:
+    out = []
+
+    def apply(st):
+        if STAGES.index(stage) > STAGES.index(st["stage"]):
+            raise TaskError("stage %s is not reached yet (task is at %s)" % (stage, st["stage"]))
+        out.append(_open_run(root, project, st, stage, session, carry=not recheck))
+
+    _mutate(task_dir(project, task_id), session, apply)
+    return out[0]
 
 
 def _first_line(text: str) -> str:
@@ -160,11 +265,13 @@ def show(project: Path, task_id: str) -> str:
                                                          run["started"], run["ended"] or "open"))
         for g in run["gates"]:
             ev = run["evidence"].get(g["id"])
-            out.append("  - %s: %s" % (g["id"], "pending (wants: %s)" % g["evidence_wanted"] if ev is None else
-                                       "passed at %s by %s%s\n    %s" % (
-                                           ev["at"], ev["session"],
-                                           " (carried from run %s)" % ev["carried_from"] if ev.get("carried_from") else "",
-                                           ev["text"].strip().replace("\n", "\n    "))))
+            if ev is None:
+                out.append("  - %s: pending (wants: %s)" % (g["id"], g["evidence_wanted"]))
+                continue
+            first, _, rest = ev["text"].strip().partition("\n")
+            carried = " (carried from run %s)" % ev["carried_from"] if ev.get("carried_from") else ""
+            out.append("  - %s: %s%s · %s by %s" % (g["id"], first, carried, ev["at"], ev["session"]))
+            out += ["      " + line for line in rest.splitlines()]
     return "\n".join(out) + "\n"
 
 
