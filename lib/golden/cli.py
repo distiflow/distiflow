@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, hooks, overlay, paths, profile, session, state, task
+from golden import brief, hooks, init, overlay, paths, profile, session, state, task
 from golden.practices import STAGES
 
 
@@ -65,6 +65,26 @@ def cmd_brief(args) -> int:
         print("golden: %s" % e, file=sys.stderr)
         return 2
     print(text, end="")
+    return 0
+
+
+def cmd_init(args) -> int:
+    proj = _project()
+    if proj is None:
+        return 3
+    root = paths.plugin_root()
+    if args.propose:
+        print(init.propose(root, proj), end="")
+        return 0
+    try:
+        print(init.write(root, proj, sys.stdin.read(), args.allow_removal), end="")
+    except profile.ProfileError as e:
+        for line in e.errors:
+            print(line, file=sys.stderr)
+        return 1
+    except init.InitError as e:
+        print("golden: %s" % e, file=sys.stderr)
+        return 1
     return 0
 
 
@@ -211,6 +231,11 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
+    ini = sub.add_parser("init", help="propose a project profile, or write the confirmed one from stdin")
+    mode = ini.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--propose", action="store_true", help="print a proposal; writes nothing")
+    mode.add_argument("--write", choices=["-"], help="write the profile read from stdin")
+    ini.add_argument("--allow-removal", action="store_true", help="let --write drop keys the saved profile has")
     sh = sub.add_parser("ship", help="hand off or finish a task in the ship stage")
     sh.add_argument("id")
     sh.add_argument("--merged", action="store_true", help="confirm the merge when golden cannot see it")
@@ -226,6 +251,8 @@ def main(argv: list[str]) -> int:
         return cmd_override(args)
     if args.cmd == "task":
         return cmd_task(args, flag)
+    if args.cmd == "init":
+        return cmd_init(args)
     if args.cmd == "note":
         return cmd_note(args, flag)
     if args.cmd in ("gate", "advance", "stage", "ship", "worktree"):

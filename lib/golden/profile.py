@@ -70,16 +70,20 @@ def _validate(value, spec, dotted: str, errs: list, roles) -> None:
                 errs.append("%s: unknown key%s" % (sub, " (did you mean %s?)" % hint[0] if hint else ""))
 
 
-def _read(path: Path, roles) -> dict:
+def _parse(text: str, name: str, roles) -> dict:
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
-        raise ProfileError(["%s: invalid TOML: %s" % (path.name, e)]) from None
+        raise ProfileError(["%s: invalid TOML: %s" % (name, e)]) from None
     errs = []
     _validate(data, SCHEMA, "", errs, roles)
     if errs:
-        raise ProfileError(["%s: %s" % (path.name, e) for e in errs])
+        raise ProfileError(["%s: %s" % (name, e) for e in errs])
     return data
+
+
+def _read(path: Path, roles) -> dict:
+    return _parse(path.read_text(encoding="utf-8"), path.name, roles)
 
 
 def _merge(base: dict, over: dict) -> dict:
@@ -151,6 +155,18 @@ def load_profile(project: Path, practices: list[Practice], roles=(), upstream_ga
 
 def gate_disables(profile: dict) -> dict[str, str]:
     return {d["id"]: d["reason"].strip() for d in _disables(profile, "gates")}
+
+
+def check_text(text: str, root: Path, project: Path) -> dict:
+    """Validate a committed profile given as text, as load_for would; raises ProfileError."""
+    from golden import overlay
+    practices = overlay.load_practices(root, project)[0]
+    upstream = frozenset(p.id for p in overlay.load_practices(root, None)[0] if p.gate)
+    data = _parse(text, COMMITTED, tuple(overlay.load_toml("models.toml", root, project)[0].get("roles", {})))
+    errs, _ = _gate_rules(data, {}, practices, upstream, project)
+    if errs:
+        raise ProfileError(errs)
+    return data
 
 
 def load_for(root: Path, project: Path, practices: list[Practice]) -> tuple[dict, list[str]]:

@@ -1,0 +1,29 @@
+# Project signals: a signal is present when any tracked or untracked (not ignored) file matches a glob.
+# Practices select on signals; init proposes them; a change since init is reported as drift.
+
+[signals.has-tests]
+files = ["tests/**", "test/**", "**/*.test.*", "**/*_test.*", "**/test_*.py"]
+
+[signals.has-migrations]
+files = ["**/migrations/**"]
+
+[signals.has-ui]
+files = ["**/*.tsx", "**/*.vue", "**/*.svelte"]
+
+[signals.has-api-spec]
+files = ["**/openapi*.y*ml", "**/openapi*.json"]
+
+[signals.has-ci]
+files = [".github/workflows/*"]
+
+[signals.has-docker]
+files = ["**/Dockerfile", "**/docker-compose*.y*ml"]
+
+[signals.python]
+files = ["**/*.py"]
+
+[signals.node]
+files = ["package.json"]
+
+[signals.typescript]
+files = ["**/*.ts"]

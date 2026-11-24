@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from golden import overlay, paths, profile
+from golden import overlay, paths, profile, signals
 from golden.overlay import Resolved
 from golden.practices import STAGES, kinds, strip_header
 from golden.selection import Selection, select
@@ -64,6 +64,10 @@ def build_brief(root: Path, project: Path, stage: str, kind: str, task_id: str |
     issues += stage_text.issues
     selection = select(stage, kind, prof, practices, issues, tomls["limits"])
     warnings = warnings + [i.reason for i in issues if i.kind in _WARN_KINDS] + selection.notes
+    if "signals" in prof.get("project", {}):
+        diff = signals.drift(prof["project"]["signals"], signals.detect_signals(project, root))
+        if diff:
+            warnings.append("signals differ from profile: %s; update with /golden:init" % " ".join(diff))
     text = render_brief(task_id=task_id, kind=kind, stage=stage, version=paths.version(root), stage_text=stage_text,
                         selection=selection, plan=model_plan(stage, prof, tomls["models"]), warnings=warnings,
                         kinds_toml=tomls["kinds"])
