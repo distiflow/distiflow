@@ -21,6 +21,9 @@ max_tokens = 1500
 [skill]
 max_tokens = 5000
 
+[stage]
+max_tokens = 2000
+
 [contribute]
 shortlist = 5
 similar_threshold = 0.6

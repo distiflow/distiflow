@@ -1,9 +1,11 @@
 import math
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 STAGES = ("understand", "plan", "implement", "verify", "review", "ship")
+STAGE_PARTS = ("### Purpose", "### Do", "### Roles", "### Record", "### Exit")
 RUN_COSTS = ("cheap", "medium", "expensive")
 _HEADER_PREFIXES = ("<!-- distiflow-override ", "# distiflow-override ")
 _REQUIRED = ("id", "stages", "run_cost")
@@ -97,3 +99,22 @@ def parse_practice(path: Path, source: str, known_kinds) -> Practice:
                     signals=opt("signals"), run_cost=meta["run_cost"], gate=meta.get("gate", False),
                     evidence=meta.get("evidence", ""), priority=meta.get("priority", 50), body=body,
                     path=path, source=source, tokens=math.ceil(len(text) / 4))
+
+
+def stage_problems(text: str) -> list[str]:
+    """Shape problems of a stage file: its five parts in order, at most 120 lines, the exit commands."""
+    lines, out = text.splitlines(), []
+    at = [lines.index(p) if p in lines else -1 for p in STAGE_PARTS]
+    missing = [p for p, i in zip(STAGE_PARTS, at) if i < 0]
+    if missing:
+        out.append("missing %s" % ", ".join(missing))
+    elif at != sorted(at):
+        out.append("parts out of order; keep %s" % " ".join(STAGE_PARTS))
+    if len(lines) > 120:
+        out.append("%d lines > 120" % len(lines))
+    if re.search(r"^## ", text, re.M):
+        out.append("a ## heading would split the brief's sections")
+    exit_part = text.split("### Exit", 1)[1] if "### Exit" in text else ""
+    if "distiflow ship" not in exit_part and not ("distiflow gate pass" in exit_part and "distiflow advance" in exit_part):
+        out.append("### Exit must end with distiflow gate pass and distiflow advance (or distiflow ship)")
+    return out

@@ -95,10 +95,13 @@ def cmd_contrib(args) -> int:
     root = paths.plugin_root()
     try:
         if args.sub == "new":
-            if bool(args.idea) == bool(args.skill):
-                print("distiflow: give an idea or --skill <dir>, not both", file=sys.stderr)
+            if sum(map(bool, (args.idea, args.skill, args.edit))) != 1:
+                print("distiflow: give one of an idea, --skill <dir> or --edit <path>", file=sys.stderr)
                 return 2
-            print(contrib.new(proj, " ".join(args.idea), Path(args.skill) if args.skill else None), end="")
+            if args.edit:
+                print(contrib.new_edit(root, proj, args.edit), end="")
+            else:
+                print(contrib.new(proj, " ".join(args.idea), Path(args.skill) if args.skill else None), end="")
         elif args.sub == "check":
             text, passed = contrib.check(root, proj, args.slug)
             print(text, end="")
@@ -302,10 +305,11 @@ def main(argv: list[str]) -> int:
     nw = cb.add_parser("new", help="start a contribution from an idea or a skill folder")
     nw.add_argument("idea", nargs="*")
     nw.add_argument("--skill", metavar="DIR", help="share this skill folder (SKILL.md only)")
+    nw.add_argument("--edit", metavar="PATH", help="propose a change to this upstream stage, practice or shared skill")
     cb.add_parser("check", help="sanitize and check the draft").add_argument("slug")
     cf = cb.add_parser("confirm", help="confirm the checked draft for sending")
     cf.add_argument("slug")
-    cf.add_argument("--verdict", required=True, help="new | extends:<id> | duplicate:<id>")
+    cf.add_argument("--verdict", required=True, help="new | extends:<id> | duplicate:<id> | edit")
     sd = cb.add_parser("send", help="send the confirmed contribution as a change request")
     sd.add_argument("slug")
     sd.add_argument("--issue", action="store_true", help="without write access, open an issue instead")
