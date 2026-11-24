@@ -8,9 +8,12 @@ import tomllib
 from pathlib import Path
 
 from distiflow import fsutil, glossary, names, overlay, profile, scan, similar, skills, worktree
-from distiflow.practices import _check, kinds, split_frontmatter
+from distiflow.practices import _check, kinds, split_frontmatter, stage_problems
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+# Upstream files a contribution may edit; the alphabet keeps "..", absolute paths and TOML out.
+EDITABLE = re.compile(r"core/stages/[a-z]+\.md|core/practices/[a-z]+/[a-z0-9][a-z0-9-]*\.md"
+                      r"|skills/[a-z0-9][a-z0-9-]*/SKILL\.md")
 CHECKS = ("format", "size", "leaks", "hostile", "glossary-alias")
 
 
@@ -63,6 +66,46 @@ def new(project: Path, idea: str, skill: Path | None = None) -> str:
     return "skill copied to %s; edit it if needed, then run distiflow contrib check %s\n" % (d / "draft.md", slug)
 
 
+def _edit_id(rel: str) -> str:
+    return rel.split("/")[1] if rel.startswith("skills/") else Path(rel).stem
+
+
+def _edit_kind(rel: str) -> str:
+    return "skill" if rel.startswith("skills/") else "stage" if rel.startswith("core/stages/") else "practice"
+
+
+def new_edit(root: Path, project: Path, rel: str) -> str:
+    """Start an edit of one upstream file, from the project's override body when there is one."""
+    if not EDITABLE.fullmatch(rel) or (rel.startswith("skills/") and _edit_id(rel) not in skills.shared(root)):
+        raise ContribError("%s: only core/stages/<stage>.md, core/practices/<stage>/<id>.md or "
+                           "skills/<shared skill>/SKILL.md can be edited" % rel, 2)
+    f = root / rel
+    if not f.is_file():
+        raise ContribError("%s: no such upstream file" % rel)
+    slug = "edit-" + _edit_id(rel)
+    d = folder(project, slug, must_exist=False)
+    if d.is_dir():
+        return "draft exists: %s; continue it or distiflow contrib discard %s --confirm\n" % (d, slug)
+    text, base = f.read_text(encoding="utf-8"), sha256(f)
+    o = overlay.override_dir(project) / rel.removeprefix("core/")
+    if rel.startswith("core/") and o.is_file():
+        first, _, body = o.read_text(encoding="utf-8").partition("\n")
+        m = overlay._HEADER.match(first)
+        if m:
+            text, base = body, m.group(1)
+    d.mkdir(parents=True)
+    fsutil.atomic_write(d / "edit.json", json.dumps({"target": rel, "base": base}))
+    fsutil.atomic_write(d / "draft.md", text)
+    return "%s copied to %s; edit it, then run distiflow contrib check %s\n" % (rel, d / "draft.md", slug)
+
+
+def _edit(d: Path) -> dict | None:
+    try:
+        return json.loads((d / "edit.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def _is_skill(d: Path) -> bool:
     return (d / "kind").is_file() and (d / "kind").read_text(encoding="utf-8").strip() == "skill"
 
@@ -75,29 +118,42 @@ def _limits(root: Path, project: Path) -> dict:
     return overlay.load_toml("limits.toml", root, project)[0]
 
 
-def _checks(text: str, root: Path, project: Path, prof: dict, skill: bool = False) -> tuple[dict, dict]:
-    """Every check runs and reports, also after an earlier one failed (S49)."""
-    results, meta = {}, {}
-    if skill:
-        limit = _limits(root, project).get("skill", {}).get("max_tokens", 5000)
-        found = skills.problems(text, None, limit)
-        results["format"] = "; ".join(p for p in found if not p.startswith("size "))
-        results["size"] = "; ".join(p for p in found if p.startswith("size "))
+def _format(text: str, root: Path, project: Path, kind: str, name: str | None) -> tuple[list, dict]:
+    """Format and size problems of a practice, skill or stage draft; name pins the id an edit keeps."""
+    limits, meta, found = _limits(root, project), {}, []
+    tokens = math.ceil(len(text) / 4)
+    if kind == "skill":
+        found = skills.problems(text, name, limits.get("skill", {}).get("max_tokens", 5000))
         try:
             meta = skills.parse(text)
             meta["id"] = meta["name"]
         except ValueError:
             pass
+        return found, meta
+    if kind == "stage":
+        found, meta, limit = stage_problems(text), {"id": name}, limits.get("stage", {}).get("max_tokens", 2000)
     else:
         try:
             front, _ = split_frontmatter(text)
             meta = tomllib.loads(front)
             _check(meta, Path("%s.md" % meta.get("id", "")), kinds(root))
-            results["format"] = ""
         except (ValueError, tomllib.TOMLDecodeError) as e:
-            results["format"] = str(e)
-        tokens, limit = math.ceil(len(text) / 4), _limits(root, project)["practice"]["max_tokens"]
-        results["size"] = "" if tokens <= limit else "size %d > limit %d" % (tokens, limit)
+            found.append(str(e))
+        if name is not None and meta.get("id") != name:
+            found.append("id %s: an edit keeps the id %s" % (meta.get("id"), name))
+        limit = limits["practice"]["max_tokens"]
+    if tokens > limit:
+        found.append("size %d > limit %d" % (tokens, limit))
+    return found, meta
+
+
+def _checks(text: str, root: Path, project: Path, prof: dict, kind: str = "practice",
+            name: str | None = None) -> tuple[dict, dict]:
+    """Every check runs and reports, also after an earlier one failed (S49)."""
+    results = {}
+    found, meta = _format(text, root, project, kind, name)
+    results["format"] = "; ".join(p for p in found if not p.startswith("size "))
+    results["size"] = "; ".join(p for p in found if p.startswith("size "))
     leaks = scan.scan_leaks(text, scan.deny_terms_for(prof, project))
     results["leaks"] = "; ".join("line %d %s: %s" % (f.line, f.rule, f.match) for f in leaks)
     hostile = scan.scan_hostile(text)
@@ -118,25 +174,36 @@ def check(root: Path, project: Path, slug: str) -> tuple[str, bool]:
     prof = profile.load_for(root, project, overlay.load_practices(root, project)[0])[0]
     text, replaced = glossary.rewrite(draft, prof.get("glossary", {}))
     fsutil.atomic_write(d / "sanitized.md", text)
-    skill = _is_skill(d)
-    results, meta = _checks(text, root, project, prof, skill)
+    edit, skill = _edit(d), _is_skill(d)
+    kind = _edit_kind(edit["target"]) if edit else "skill" if skill else "practice"
+    results, meta = _checks(text, root, project, prof, kind, _edit_id(edit["target"]) if edit else None)
+    upstream_text = (root / edit["target"]).read_text(encoding="utf-8") if edit else ""
+    if edit and text == upstream_text:
+        results["format"] = "; ".join(filter(None, [results["format"], "no change against upstream"]))
     passed = not any(results.values())
-    cls = ["%s: %s" % (k, ", ".join(meta[k]) if isinstance(meta.get(k), list) else meta.get(k, "-"))
-           for k in (("name", "description") if skill else ("stages", "kinds", "signals", "run_cost", "gate"))]
+    keys = (() if kind == "stage" else ("name", "description") if kind == "skill"
+            else ("stages", "kinds", "signals", "run_cost", "gate"))
+    cls = (["target: %s" % edit["target"]] if edit else []) + [
+        "%s: %s" % (k, ", ".join(meta[k]) if isinstance(meta.get(k), list) else meta.get(k, "-")) for k in keys]
     diff = difflib.unified_diff((d / "original.md").read_text(encoding="utf-8").splitlines(), text.splitlines(),
                                 "original.md", "sanitized.md", lineterm="")
-    upstream = skills.shared(root) if skill else upstream_practices(root)
-    corpus = {pid: p.read_text(encoding="utf-8") for pid, p in upstream.items() if p.is_file()}
-    top = similar.shortlist(text, corpus, _limits(root, project)["contribute"]["shortlist"])
     out = ["## Classification", *cls,
            "## Checks", *("%s: %s" % (c, "pass" if not results[c] else "FAIL " + results[c]) for c in CHECKS),
            "## Replaced terms", *(["%s → %s ×%d" % r for r in replaced] or ["- none"]),
-           "## Diff", *(list(diff) or ["- no changes"]),
-           "## Similar upstream %s" % ("skills" if skill else "practices"),
-           *(["%s %.3f" % s for s in top] or ["- none"])]
+           "## Diff", *(list(diff) or ["- no changes"])]
+    if edit:
+        change = difflib.unified_diff(upstream_text.splitlines(), text.splitlines(), edit["target"], "sanitized.md",
+                                      lineterm="")
+        out += ["## Change against upstream", *(list(change) or ["- no changes"])]
+    else:
+        upstream = skills.shared(root) if skill else upstream_practices(root)
+        corpus = {pid: p.read_text(encoding="utf-8") for pid, p in upstream.items() if p.is_file()}
+        top = similar.shortlist(text, corpus, _limits(root, project)["contribute"]["shortlist"])
+        out += ["## Similar upstream %s" % ("skills" if skill else "practices"),
+                *(["%s %.3f" % s for s in top] or ["- none"])]
     fsutil.atomic_write(d / "check.json", json.dumps({"passed": passed, "sha256": sha256(d / "sanitized.md"),
                                                       "id": meta.get("id"), "stages": meta.get("stages"),
-                                                      "skill": skill}))
+                                                      "skill": skill, "edit": edit}))
     return "\n".join(out) + "\n", passed
 
 
@@ -151,10 +218,17 @@ def confirm(root: Path, project: Path, slug: str, verdict: str) -> str:
     if chk.get("sha256") != sha256(d / "sanitized.md"):
         raise ContribError("sanitized.md changed after check; run distiflow contrib check %s again" % slug)
     kind, _, pid = verdict.partition(":")
+    edit = chk.get("edit")
+    if edit and verdict != "edit":
+        raise ContribError("an edit is confirmed with --verdict edit (got %s)" % verdict)
+    if not edit and kind == "edit":
+        raise ContribError("verdict edit is only for drafts started with --edit")
     if kind == "duplicate":
         raise ContribError("duplicate of %s; nothing to send" % pid)
     shared = skills.shared(root)
-    if chk.get("skill") and kind == "new" and not pid:
+    if edit:
+        target = edit["target"]
+    elif chk.get("skill") and kind == "new" and not pid:
         if chk["id"] in shared:
             raise ContribError("skill %s already exists upstream; confirm with --verdict extends:%s"
                                % (chk["id"], chk["id"]))
@@ -169,7 +243,10 @@ def confirm(root: Path, project: Path, slug: str, verdict: str) -> str:
         target = upstream_practices(root)[pid].relative_to(root).as_posix()
     else:
         raise ContribError("verdict must be new, extends:<upstream id> or duplicate:<id> (got %s)" % verdict)
-    fsutil.atomic_write(d / "confirmed.json", json.dumps({"sha256": chk["sha256"], "verdict": kind, "target": target}))
+    # The upstream bytes this draft replaces; send refuses when upstream moved past them.
+    base = edit["base"] if edit else sha256(root / target) if kind == "extends" else None
+    fsutil.atomic_write(d / "confirmed.json", json.dumps({"sha256": chk["sha256"], "verdict": kind, "target": target,
+                                                         "base": base}))
     return "confirmed %s as %s → %s\n" % (slug, verdict, target)
 
 
@@ -236,17 +313,17 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
     url, repo = _upstream(root)
     wc = Path.home() / ".distiflow" / "upstream"
     target = conf["target"]
-    area = "skills" if target.startswith("skills/") else "core/practices"
-    pid = Path(target).parent.name if area == "skills" else Path(target).stem
-    noun = "skills" if area == "skills" else "practices"
-    msg = ("feat(%s): add %s" if conf["verdict"] == "new" else "docs(%s): extend %s") % (noun, pid)
+    area = "/".join(target.split("/")[:1 if target.startswith("skills/") else 2])
+    pid = _edit_id(target)
+    noun = Path(area).name
+    msg = {"new": "feat(%s): add %s", "edit": "docs(%s): edit %s"}.get(conf["verdict"], "docs(%s): extend %s") % (noun, pid)
     # --update is user input that reaches git: only an existing contribution branch name is accepted.
     if update is not None and not (update.startswith("contrib/") and SLUG.fullmatch(update[len("contrib/"):])):
         raise ContribError("not a contribution branch: %r (expected contrib/<slug>)" % update, 2)
     # The branch is public: name it from the checked practice id, never from the raw idea text.
     if not SLUG.fullmatch(pid):
         raise ContribError("id %r cannot name a branch; use lower-case words and hyphens" % pid)
-    branch = update or "contrib/%s" % pid
+    branch = update or "contrib/%s%s" % ("edit-" if conf["verdict"] == "edit" else "", pid)
     try:
         if not (wc / ".git").is_dir():
             wc.parent.mkdir(parents=True, exist_ok=True)
@@ -262,7 +339,11 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
             raise ContribError("contribution branch %s already exists upstream and was not sent from this draft: "
                                "rerun with --update %s or change the practice id" % (branch, branch), 2)
         worktree.must("checkout", "-q", "-B", branch, start, cwd=wc)
-        if not update and not force_new:
+        base = conf.get("base")
+        if base and start == "origin/main" and (not (wc / target).is_file() or sha256(wc / target) != base):
+            raise ContribError("%s changed upstream since this draft started; update distiflow, discard the draft "
+                               "and start again" % target)
+        if not update and not force_new and conf["verdict"] != "edit":
             limit = _limits(root, project)["contribute"]["similar_threshold"]
             near = _similar_open(wc, branch, text, limit, area)
             if near:
@@ -286,7 +367,7 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
             if not issue:
                 raise ContribError("no write access to %s: rerun with --issue to open an issue with the same "
                                    "content" % repo, 2)
-            r = worktree.gh("issue", "create", "--repo", repo, "--title", "%s idea: %s" % ("Skill" if area == "skills" else "Practice", pid),
+            r = worktree.gh("issue", "create", "--repo", repo, "--title", "%s idea: %s" % (noun[:-1].capitalize(), pid),
                             "--body-file", str(d / "sanitized.md"), cwd=wc)
             if r.returncode != 0:
                 raise ContribError("gh issue create failed; rerun distiflow contrib send %s --issue" % slug)
