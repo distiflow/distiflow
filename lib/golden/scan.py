@@ -43,7 +43,8 @@ _JOINERS = re.compile(r"[-_*`~.]")
 
 def normalize(text: str) -> str:
     """Spellings of one term become one string; whitespace is kept so separate words never join."""
-    s = unicodedata.normalize("NFKC", text).casefold().translate(HOMOGLYPHS)
+    s = unicodedata.normalize("NFKC", text)
+    s = "".join(c for c in s if unicodedata.category(c) != "Cf").casefold().translate(HOMOGLYPHS)  # soft hyphen, zero-width
     return _JOINERS.sub("", urllib.parse.unquote(s))
 
 
@@ -68,13 +69,15 @@ def _ips(line: str) -> list[str]:
 
 
 def scan_leaks(text: str, deny_terms: list[str]) -> list[Finding]:
-    terms = [t for t in (normalize(t) for t in deny_terms) if len(t) >= 3]
+    terms = [t for t in (" ".join(normalize(t).split()) for t in deny_terms) if len(t) >= 3]
     found = []
     for n, line in enumerate(text.splitlines(), 1):
         found += [Finding("secret", m.group(0), n) for p in SECRETS for m in p.finditer(line)]
         found += [Finding("email", m, n) for m in EMAIL.findall(line)]
         found += [Finding("host", m, n) for m in HOST.findall(line) if not _allowed_host(m)]
         found += [Finding("ip", m, n) for m in _ips(line)]
+        flat = " ".join(normalize(line).split())
+        found += [Finding("deny-term", t, n) for t in terms if " " in t and t in flat]
         for token in line.split():
             if any(t in normalize(token) for t in terms):
                 found.append(Finding("deny-term", token.strip(".,;:()[]\"'"), n))

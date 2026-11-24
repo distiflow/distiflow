@@ -42,7 +42,11 @@ def _leaves(d: dict, prefix: str = "") -> set[str]:
     out = set()
     for k, v in d.items():
         path = prefix + k
-        out |= _leaves(v, path + ".") if isinstance(v, dict) and v else {path}
+        if isinstance(v, dict) and v:
+            out |= _leaves(v, path + ".")
+        else:
+            # A list item that disappears is a removal too: deny_terms must never shrink silently.
+            out |= {path} | ({"%s=%s" % (path, x) for x in v if isinstance(x, str)} if isinstance(v, list) else set())
     return out
 
 

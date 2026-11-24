@@ -140,11 +140,13 @@ def cmd_check(args) -> int:
 
 
 def cmd_scan(args) -> int:
+    # A typo must not turn the pre-commit scan into a silent pass.
+    missing = [p for p in args.paths + ([args.deny_file] if args.deny_file else []) if not Path(p).exists()]
+    if missing:
+        print("golden: no such path %s" % ", ".join(missing), file=sys.stderr)
+        return 2
     terms = scan.read_deny_file(Path(args.deny_file)) if args.deny_file else []
-    missing = [p for p in args.paths if not Path(p).exists()]
-    for p in missing:
-        print("golden: no such path %s (skipped)" % p, file=sys.stderr)
-    hits = scan.scan_paths([Path(p) for p in args.paths if p not in missing], terms)
+    hits = scan.scan_paths([Path(p) for p in args.paths], terms)
     for path, f in hits:
         print("%s:%d: %s: %s" % (path, f.line, f.rule, f.match))
     return 1 if hits else 0

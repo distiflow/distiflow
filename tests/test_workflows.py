@@ -29,5 +29,7 @@ class Workflows(unittest.TestCase):
         texts = self.texts()
         self.assertIn("check --release", texts["release.yml"])
         self.assertIn('"3.10"', texts["check.yml"])
-        self.assertIn("test $? -eq 3", texts["check.yml"])
+        guard = texts["check.yml"].split("py310-guard:", 1)[1].split("\n  gitleaks:", 1)[0]
+        self.assertIn("needs Python 3.11", guard)  # exit 3 alone also comes from "no session id"
+        self.assertNotIn("|| test", guard)
         self.assertIn("check --ci --base", texts["check.yml"])

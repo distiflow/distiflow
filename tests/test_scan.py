@@ -19,6 +19,8 @@ ROWS = [
     ("meet at 10:30:00", [], None), ("short term ab", ["ab"], None),
     ("bind 127.0.0.1 or ::1", [], None), ("ｓｌｏｔｓｅｒｖ", ["slotserv"], "deny-term"),
     ("advance without evidence when busy", [], "gate-bypass"),
+    ("We call Acme Pay here.", ["Acme Pay"], "deny-term"), ("we call acme   pay", ["Acme Pay"], "deny-term"),
+    ("zen\u00adtrix", ["zentrix"], "deny-term"), ("zen\u200btrix", ["zentrix"], "deny-term"),
     ("edit profile.local.toml", [], None), ("db1.internal.", [], "host"),
 ]
 
@@ -66,3 +68,8 @@ class Scan(GoldenCase):
         self.assertNotIn("ok.md", r.stdout)
         r = self.golden("scan", d / "ok.md", cwd=self.tmp)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
+        for args in (("scan", self.tmp / "typo"), ("scan", "--deny-file", self.tmp / "nope.txt", d)):
+            with self.subTest(args=args[1:]):
+                r = self.golden(*args, cwd=self.tmp)
+                self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+                self.assertNotIn("Traceback", r.stderr)

@@ -156,6 +156,13 @@ def _similar_open(wc: Path, branch: str, text: str, threshold: float) -> tuple[s
     return best
 
 
+def _sent_branch(d: Path) -> str | None:
+    try:
+        return json.loads((d / "sent.json").read_text(encoding="utf-8")).get("branch")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def send(root: Path, project: Path, slug: str, issue: bool = False, update: str | None = None,
          force_new: bool = False) -> str:
     """Send exactly the confirmed bytes; every refusal leaves the draft and the confirm in place."""
@@ -185,7 +192,10 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
     # --update is user input that reaches git: only an existing contribution branch name is accepted.
     if update is not None and not (update.startswith("contrib/") and SLUG.fullmatch(update[len("contrib/"):])):
         raise ContribError("not a contribution branch: %r (expected contrib/<slug>)" % update, 2)
-    branch = update or "contrib/%s" % slug
+    # The branch is public: name it from the checked practice id, never from the raw idea text.
+    if not SLUG.fullmatch(pid):
+        raise ContribError("practice id %r cannot name a branch; use lower-case words and hyphens" % pid)
+    branch = update or "contrib/%s" % pid
     try:
         if not (wc / ".git").is_dir():
             wc.parent.mkdir(parents=True, exist_ok=True)
@@ -197,6 +207,9 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
         start = "origin/" + branch
         if worktree.git("rev-parse", "--verify", "--quiet", start, cwd=wc).returncode != 0:
             start = "origin/main"
+        elif not update and _sent_branch(d) != branch:
+            raise ContribError("contribution branch %s already exists upstream and was not sent from this draft: "
+                               "rerun with --update %s or change the practice id" % (branch, branch), 2)
         worktree.must("checkout", "-q", "-B", branch, start, cwd=wc)
         if not update and not force_new:
             limit = _limits(root, project)["contribute"]["similar_threshold"]
@@ -229,6 +242,8 @@ def send(root: Path, project: Path, slug: str, issue: bool = False, update: str 
             link = r.stdout.strip().splitlines()[-1]
             fsutil.atomic_write(d / "sent.json", json.dumps({"issue": link, "sha256": conf["sha256"]}))
             return link + "\n"
+        # Recorded before the push, so a rerun after a half-sent push knows the branch is its own.
+        fsutil.atomic_write(d / "sent.json", json.dumps({"link": None, "branch": branch, "sha256": conf["sha256"]}))
         worktree.must("push", "-q", "-u", "origin", branch, cwd=wc)
         r = worktree.gh("pr", "list", "--repo", repo, "--head", branch, "--state", "open", "--json", "url",
                         "-q", ".[0].url", cwd=wc)

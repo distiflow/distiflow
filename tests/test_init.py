@@ -87,6 +87,15 @@ class Init(GoldenCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual((self.proj / ".golden/profile.toml").read_text(), trimmed)
 
+    def test_reinit_never_drops_deny_terms_silently(self):
+        """S4 I2: shrinking a saved list such as deny_terms counts as a removal."""
+        saved = '[project]\nname = "proj"\ndeny_terms = ["acme", "zentrix"]\n'
+        write_profile(self.proj, saved)
+        r = self.g("--write", "-", stdin='[project]\nname = "proj"\ndeny_terms = []\n')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("project.deny_terms", r.stderr)
+        self.assertEqual((self.proj / ".golden/profile.toml").read_text(), saved)
+
     def test_detect_base_master(self):
         """S1: the base branch is the repo's own, not an assumed main."""
         r = self.repo("old")

@@ -196,5 +196,35 @@ class Extends(SendCase):  # T23 S42 S43
         r = self.c("send", "test-first-fix")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("https://example.invalid/pull/", r.stdout)
-        self.assertEqual(self.pushed("contrib/test-first-fix")[0], ["core/practices/plan/tests-first.md"])
+        self.assertEqual(self.pushed("contrib/tests-first")[0], ["core/practices/plan/tests-first.md"])
         self.assertEqual(self.gh_state()["prs"][0]["title"], "docs(practices): extend tests-first")
+
+
+class Branches(SendCase):  # I2 R23
+    def test_branch_named_from_checked_id_not_idea(self):
+        """I2: the pushed branch name comes from the checked practice id, never from raw idea text."""
+        self.draft(slug="retry-zentrix-webhooks", pid="retry-webhooks", body="Retry a failed call with backoff, at most three times.")
+        self.assertEqual(self.c("check", "retry-zentrix-webhooks").returncode, 0)
+        self.assertEqual(self.c("confirm", "retry-zentrix-webhooks", "--verdict", "new").returncode, 0)
+        r = self.c("send", "retry-zentrix-webhooks")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        refs = "\n".join(self.contrib_refs())
+        self.assertIn("refs/heads/contrib/retry-webhooks", refs)
+        self.assertNotIn("zentrix", refs + json.dumps(self.gh_state()))
+
+    def test_never_builds_on_someone_elses_branch(self):
+        """I1 R23: an upstream contrib branch this draft did not create is not reused unless --update says so."""
+        other = self.tmp / "other"
+        self.git("clone", "-q", str(self.bare), str(other), cwd=self.tmp)
+        self.git("switch", "-q", "-c", "contrib/test-first-fix", cwd=other)
+        w(other / "core/practices/plan/theirs.md", "their work\n")
+        self.git("add", ".", cwd=other)
+        self.git("commit", "-q", "-m", "theirs", cwd=other)
+        self.git("push", "-q", "origin", "contrib/test-first-fix", cwd=other)
+        before = self.git("rev-parse", "contrib/test-first-fix", cwd=self.bare)
+        self.ready()
+        r = self.c("send", "test-first-fix")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("already exists upstream", r.stderr)
+        self.assertEqual(self.git("rev-parse", "contrib/test-first-fix", cwd=self.bare), before)
+        self.assertEqual(self.c("send", "test-first-fix", "--update", "contrib/test-first-fix").returncode, 0)

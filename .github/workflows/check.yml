@@ -39,8 +39,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      # The step shell stops on the first failure, so the expected exit 3 is tested inline.
-      - run: python bin/golden whoami || test $? -eq 3
+      # Exit 3 alone also means "no session id"; the message proves the version gate fired.
+      - shell: bash
+        run: |
+          set +e
+          out=$(python bin/golden whoami 2>&1); rc=$?
+          echo "$out"
+          test $rc -eq 3 && grep -q "needs Python 3.11" <<<"$out"
 
   gitleaks:
     runs-on: ubuntu-latest
