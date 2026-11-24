@@ -7,7 +7,7 @@ import shutil
 import tomllib
 from pathlib import Path
 
-from golden import fsutil, glossary, names, overlay, profile, scan, similar
+from golden import fsutil, glossary, names, overlay, profile, scan, similar, worktree
 from golden.practices import _check, kinds, split_frontmatter
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
@@ -131,3 +131,117 @@ def discard(project: Path, slug: str, confirmed: bool) -> str:
         raise ContribError("this deletes %s; rerun with --confirm" % d, 2)
     shutil.rmtree(d)
     return "discarded %s\n" % slug
+
+
+def _upstream(root: Path) -> tuple[str, str]:
+    url = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")).get("repository", "")
+    m = re.search(r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise ContribError("plugin.json has no GitHub repository URL; cannot send", 3)
+    return url, "%s/%s" % m.groups()
+
+
+def _similar_open(wc: Path, branch: str, text: str, threshold: float) -> tuple[str, float] | None:
+    refs = worktree.git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/contrib/", cwd=wc).stdout.split()
+    best = None
+    for ref in refs:
+        other = ref[len("origin/"):]
+        if other == branch:
+            continue
+        files = worktree.git("diff", "--name-only", "origin/main..." + ref, "--", "core/practices", cwd=wc).stdout.split()
+        corpus = {f: worktree.git("show", "%s:%s" % (ref, f), cwd=wc).stdout for f in files}
+        top = similar.shortlist(text, corpus, k=1)
+        if top and top[0][1] >= threshold and (best is None or top[0][1] > best[1]):
+            best = (other, top[0][1])
+    return best
+
+
+def send(root: Path, project: Path, slug: str, issue: bool = False, update: str | None = None,
+         force_new: bool = False) -> str:
+    """Send exactly the confirmed bytes; every refusal leaves the draft and the confirm in place."""
+    d = folder(project, slug)
+    try:
+        conf = json.loads((d / "confirmed.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise ContribError("not confirmed; run golden contrib confirm %s --verdict new|extends:<id>" % slug, 2) from None
+    data = (d / "sanitized.md").read_bytes()
+    if hashlib.sha256(data).hexdigest() != conf["sha256"]:
+        raise ContribError("sanitized.md changed after confirm; check and confirm again")
+    prof = profile.load_for(root, project, overlay.load_practices(root, project)[0])[0]
+    text = data.decode("utf-8")
+    hits = scan.scan_leaks(text, scan.deny_terms_for(prof, project)) + scan.scan_hostile(text)
+    if hits:
+        raise ContribError("blocked by the final scan: %s" % "; ".join("%s: %s" % (f.rule, f.match) for f in hits))
+    push = prof["git"]["push"] == "allowed"
+    if push:
+        auth = worktree.gh("auth", "status", cwd=project)
+        if auth is None or auth.returncode != 0:
+            raise ContribError("GitHub sign-in missing: install gh and run gh auth login, then rerun "
+                               "golden contrib send %s" % slug, 3)
+    url, repo = _upstream(root)
+    wc = Path.home() / ".golden" / "upstream"
+    target, pid = conf["target"], Path(conf["target"]).stem
+    msg = ("feat(practices): add %s" if conf["verdict"] == "new" else "docs(practices): extend %s") % pid
+    # --update is user input that reaches git: only an existing contribution branch name is accepted.
+    if update is not None and not (update.startswith("contrib/") and SLUG.fullmatch(update[len("contrib/"):])):
+        raise ContribError("not a contribution branch: %r (expected contrib/<slug>)" % update, 2)
+    branch = update or "contrib/%s" % slug
+    try:
+        if not (wc / ".git").is_dir():
+            wc.parent.mkdir(parents=True, exist_ok=True)
+            worktree.must("clone", "-q", "--", url, str(wc), cwd=wc.parent)
+        # The work clone is scratch: anything left from earlier runs is dropped before the commit (R38).
+        worktree.must("fetch", "-q", "--prune", "origin", cwd=wc)
+        worktree.must("reset", "-q", "--hard", cwd=wc)
+        worktree.must("clean", "-q", "-ffdx", cwd=wc)
+        start = "origin/" + branch
+        if worktree.git("rev-parse", "--verify", "--quiet", start, cwd=wc).returncode != 0:
+            start = "origin/main"
+        worktree.must("checkout", "-q", "-B", branch, start, cwd=wc)
+        if not update and not force_new:
+            limit = _limits(root, project)["contribute"]["similar_threshold"]
+            near = _similar_open(wc, branch, text, limit)
+            if near:
+                raise ContribError("similar open contribution %s (%.3f): rerun with --update %s or --new"
+                                   % (near[0], near[1], near[0]), 2)
+        (wc / target).parent.mkdir(parents=True, exist_ok=True)
+        fsutil.atomic_write(wc / target, data)
+        worktree.must("add", "--", target, cwd=wc)
+        if worktree.git("diff", "--cached", "--quiet", cwd=wc).returncode != 0:
+            worktree.must("commit", "-q", "-m", msg, cwd=wc)
+        changed = worktree.must("diff", "--name-only", start + "...HEAD", cwd=wc).split()
+        blob = worktree.git("show", "HEAD:" + target, cwd=wc)
+        if not set(changed) <= {target} or blob.returncode != 0 or blob.stdout.encode("utf-8") != data:
+            raise ContribError("the work clone holds more than the confirmed change; nothing pushed")
+        if not push:
+            return ("this project does not let golden push; hand off with:\n"
+                    "git -C %s push -u origin %s\ngh pr create --repo %s --head %s --base main --title \"%s\"\n"
+                    % (wc, branch, repo, branch, msg))
+        perm = worktree.gh("api", "repos/" + repo, "--jq", ".permissions.push", cwd=wc)
+        if perm.stdout.strip() != "true":
+            if not issue:
+                raise ContribError("no write access to %s: rerun with --issue to open an issue with the same "
+                                   "content" % repo, 2)
+            r = worktree.gh("issue", "create", "--repo", repo, "--title", "Practice idea: %s" % pid,
+                            "--body-file", str(d / "sanitized.md"), cwd=wc)
+            if r.returncode != 0:
+                raise ContribError("gh issue create failed; rerun golden contrib send %s --issue" % slug)
+            link = r.stdout.strip().splitlines()[-1]
+            fsutil.atomic_write(d / "sent.json", json.dumps({"issue": link, "sha256": conf["sha256"]}))
+            return link + "\n"
+        worktree.must("push", "-q", "-u", "origin", branch, cwd=wc)
+        r = worktree.gh("pr", "list", "--repo", repo, "--head", branch, "--state", "open", "--json", "url",
+                        "-q", ".[0].url", cwd=wc)
+        if r.returncode == 0 and r.stdout.strip():
+            out = "updated %s\n" % r.stdout.strip()
+        else:
+            fsutil.atomic_write(d / "pr-body.md", "%s\n\nSent with golden contrib.\n" % msg)
+            r = worktree.gh("pr", "create", "--repo", repo, "--head", branch, "--base", "main", "--title", msg,
+                            "--body-file", str(d / "pr-body.md"), cwd=wc)
+            if r.returncode != 0:
+                raise ContribError("branch pushed, but gh pr create failed; rerun golden contrib send %s" % slug)
+            out = r.stdout.strip().splitlines()[-1] + "\n"
+    except worktree.GitError as e:
+        raise ContribError("git: %s" % e) from None
+    fsutil.atomic_write(d / "sent.json", json.dumps({"link": out.split()[-1], "branch": branch, "sha256": conf["sha256"]}))
+    return out

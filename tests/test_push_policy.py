@@ -54,3 +54,22 @@ class PushAllowed(WorktreeCase):
         self.assertIn("?? dirty.txt", r.stderr)
         self.assertEqual(self.gh_state()["prs"], [])
         self.assertEqual(self.git("ls-remote", "--heads", str(self.bare), cwd=self.tmp).count("refs/heads/"), 1)
+
+
+from tests.test_contrib_send import SendCase  # noqa: E402
+
+
+class ContribPushForbidden(SendCase):
+    def test_push_forbidden_contribute_never_pushes(self):
+        """T4 I14 S63: in a no-push project the contribution stops at a local branch and a hand-off."""
+        from tests.test_contrib_check import PROFILE
+        from tests.helpers import write_profile
+        write_profile(self.proj, PROFILE + '[git]\npush = "forbidden"\n')
+        self.ready()
+        r = self.c("send", "test-first-fix")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("push -u origin contrib/test-first-fix", r.stdout)
+        self.assertIn("gh pr create", r.stdout)
+        self.assertEqual((self.contrib_refs(), self.gh_state()["prs"]), ([], []))
+        log = self.git("log", "--oneline", "origin/main..contrib/test-first-fix", cwd=self.clone)
+        self.assertIn("feat(practices): add test-first-fix", log)

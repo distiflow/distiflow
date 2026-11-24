@@ -56,13 +56,15 @@ def main(args):
             print("pull request create failed: HTTP 502", file=sys.stderr)
             return 1
         url = "https://example.invalid/pull/%d" % (len(st["prs"]) + 1)
-        st["prs"].append({"head": opt(args, "--head"), "base": opt(args, "--base"), "url": url, "state": "OPEN"})
+        st["prs"].append({"head": opt(args, "--head"), "base": opt(args, "--base"), "repo": opt(args, "--repo"),
+                          "title": opt(args, "--title"), "url": url, "state": "OPEN"})
         save(st)
         print(url)
         return 0
     if args[:2] == ["issue", "create"]:
         url = "https://example.invalid/issues/%d" % (len(st["issues"]) + 1)
-        st["issues"].append({"title": opt(args, "--title"), "url": url})
+        body = Path(opt(args, "--body-file")).read_text() if "--body-file" in args else opt(args, "--body")
+        st["issues"].append({"title": opt(args, "--title"), "repo": opt(args, "--repo"), "body": body, "url": url})
         save(st)
         print(url)
         return 0

@@ -102,6 +102,8 @@ def cmd_contrib(args) -> int:
             return 0 if passed else 1
         elif args.sub == "confirm":
             print(contrib.confirm(root, proj, args.slug, args.verdict), end="")
+        elif args.sub == "send":
+            print(contrib.send(root, proj, args.slug, args.issue, args.update, args.new), end="")
         elif args.sub == "discard":
             print(contrib.discard(proj, args.slug, args.confirm), end="")
     except contrib.ContribError as e:
@@ -297,6 +299,12 @@ def main(argv: list[str]) -> int:
     cf = cb.add_parser("confirm", help="confirm the checked draft for sending")
     cf.add_argument("slug")
     cf.add_argument("--verdict", required=True, help="new | extends:<id> | duplicate:<id>")
+    sd = cb.add_parser("send", help="send the confirmed contribution as a change request")
+    sd.add_argument("slug")
+    sd.add_argument("--issue", action="store_true", help="without write access, open an issue instead")
+    sdm = sd.add_mutually_exclusive_group()
+    sdm.add_argument("--update", metavar="BRANCH", help="add to this open contribution branch")
+    sdm.add_argument("--new", action="store_true", help="send as its own request even when a similar one is open")
     dc = cb.add_parser("discard", help="delete a contribution draft")
     dc.add_argument("slug")
     dc.add_argument("--confirm", action="store_true")
