@@ -37,6 +37,7 @@ hooks/hooks.json   SessionStart session id · PostToolUse heartbeat · PreToolUs
 tests/             stdlib unittest, integration over temp git repos
 .github/workflows/check.yml   pull_request, no secrets
 CHANGELOG.md  LICENSE (MIT)  README.md
+assets/            README images: hero.png (brand banner), logo.svg and diagram SVGs
 ```
 
 ## Gates

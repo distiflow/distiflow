@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="distiflow">
+  <rect width="240" height="240" rx="48" fill="#14161A"/>
+  <g fill="none" stroke="#5B616A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M60 70 H112 C130 70 132 88 138 110 L150 160 C154 172 160 176 170 176"/>
+    <path d="M50 124 H92 C106 124 110 140 116 156 C120 168 126 176 140 176"/>
+    <path d="M44 176 H150"/>
+  </g>
+  <g fill="#14161A" stroke="#5B616A" stroke-width="7">
+    <circle cx="56" cy="70" r="9"/><circle cx="46" cy="124" r="9"/><circle cx="40" cy="176" r="9"/>
+  </g>
+  <path d="M152 176 H176" stroke="#E0B75D" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="190" cy="176" r="20" fill="#E0B75D"/>
+</svg>

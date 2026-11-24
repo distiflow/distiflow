@@ -24,7 +24,7 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 TLDS = ("com net org io dev app cloud co ai gg me info biz xyz tech site online us uk de eu fr nl pl ua ru ca au "
         "in jp cn br es it ch se no internal local lan corp intra private").split()
 HOST = re.compile(r"(?<![\w@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:%s))(?![\w-]|\.\w)" % "|".join(TLDS), re.I)
-ALLOWED_HOSTS = ("localhost", "example.com", "example.org", "example.net")
+ALLOWED_HOSTS = ("localhost", "example.com", "example.org", "example.net", "shields.io")  # shields.io: public README badges
 IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 IPV6 = re.compile(r"(?<![\w:])[0-9a-fA-F:]*:[0-9a-fA-F:]*:[0-9a-fA-F:]*(?![\w:])")
 ALLOWED_IPS = ("127.0.0.1", "0.0.0.0", "::1")
