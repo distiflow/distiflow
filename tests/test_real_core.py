@@ -47,3 +47,40 @@ class RealCore(GoldenCase):
                         self.assertIn("\n%s\n" % s, r.stdout)
         r = self.golden("check", "--ci", cwd=REPO)
         self.assertEqual(r.returncode, 0, r.stdout)
+
+
+def section(out, name):
+    return out.split("\n## %s\n" % name, 1)[1].split("\n## ", 1)[0]
+
+
+# (kind, stage, gates that must be in ## Gates, practices that must be loaded) — T20 S8 on the real core
+KIND_ROWS = [
+    ("feature", "understand", ["behaviour-before-architecture"], []),
+    ("fix", "understand", ["reproduce-before-fixing"], []),
+    ("fix", "verify", ["regression-test-for-fix"], []),
+    ("debug", "understand", ["reproduce-before-fixing"], []),
+    ("perf", "understand", ["perf-baseline-first"], []),
+    ("perf", "verify", ["perf-before-after"], []),
+    ("ux", "understand", [], ["ux-journeys-first"]),
+    ("ux", "verify", ["ux-running-app-check"], []),
+]
+
+
+class RealCoreKinds(GoldenCase):
+    def test_real_core_kind_gates(self):
+        """T20 S8: each kind gets its own gates from the seed practices; nothing drops for token budget."""
+        proj = self.repo()
+        write_profile(proj)
+        brief = lambda k, s: self.golden("brief", "--stage", s, "--kind", k, cwd=proj).stdout
+        for kind, stage, gates, loaded in KIND_ROWS:
+            with self.subTest(kind=kind, stage=stage):
+                out = brief(kind, stage)
+                for g in gates:
+                    self.assertIn("- %s:" % g, section(out, "Gates"))
+                for p in loaded:
+                    self.assertIn("- %s ·" % p, section(out, "Practices loaded"))
+        self.assertEqual(section(brief("debug", "plan"), "Gates").strip(), "- none")
+        for kind in KINDS:
+            for stage in STAGES:
+                with self.subTest(kind=kind, stage=stage, check="budget"):
+                    self.assertNotIn("over token budget", section(brief(kind, stage), "Not loaded"))
