@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "T-20261124-1",
+  "kind": "fix",
+  "desc": "fix login",
+  "created": "2026-11-24T10:00:00+00:00",
+  "status": "active",
+  "stage": "plan",
+  "mode": "worktree",
+  "branch": null,
+  "worktree": null,
+  "base": "main",
+  "links": [],
+  "decisions": [{"text": "keep the old endpoint", "at": "2026-11-24T10:05:00+00:00"}],
+  "open_items": [{"n": 1, "text": "check mobile", "closed_at": null}],
+  "runs": [
+    {
+      "stage": "understand", "n": 1, "version": "0.1.0", "session": "s-1",
+      "started": "2026-11-24T10:00:00+00:00", "ended": "2026-11-24T10:30:00+00:00",
+      "gates": [{"id": "repro-first", "evidence_wanted": "failing repro"}],
+      "evidence": {"repro-first": {"text": "test_login fails", "at": "2026-11-24T10:20:00+00:00",
+                                   "session": "s-1", "carried_from": null}}
+    },
+    {
+      "stage": "plan", "n": 1, "version": "0.1.0", "session": "s-1",
+      "started": "2026-11-24T10:30:00+00:00", "ended": null,
+      "gates": [], "evidence": {}
+    }
+  ]
+}
