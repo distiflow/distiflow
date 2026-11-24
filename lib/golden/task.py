@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from golden import brief, claim, fsutil, overlay, paths, profile, state
+from golden.practices import STAGES
 
 
 class TaskError(Exception):
@@ -112,6 +113,69 @@ def takeover(root: Path, project: Path, session: str, task_id: str) -> Path:
     return d
 
 
-def resume_view(d: Path, session: str) -> str:
+def note(project: Path, session: str, task_id: str, what: str, text: str) -> None:
+    d = task_dir(project, task_id)
+
+    def apply(st):
+        if what == "decision":
+            st["decisions"].append({"text": text, "at": state.now()})
+        elif what == "open":
+            st["open_items"].append({"n": len(st["open_items"]) + 1, "text": text, "closed_at": None})
+        else:
+            item = next((i for i in st["open_items"] if str(i["n"]) == text and not i["closed_at"]), None)
+            if item is None:
+                raise TaskError("no open item %s in task %s" % (text, task_id))
+            item["closed_at"] = state.now()
+
+    try:
+        state.mutate(d, session, apply)
+    except state.StateError as e:
+        raise TaskError(str(e)) from None
+
+
+def _first_line(text: str) -> str:
+    return (text.strip().splitlines() or [""])[0]
+
+
+def _open(st: dict) -> list[str]:
+    return ["#%d %s" % (i["n"], i["text"]) for i in st["open_items"] if not i["closed_at"]]
+
+
+def show(project: Path, task_id: str) -> str:
+    st = state.load(task_dir(project, task_id))
+    out = ["task %s · %s · %s · %s" % (st["id"], st["kind"], st["desc"], st["status"]), "decisions:"]
+    out += ["- " + x["text"] for x in st["decisions"]] or ["- none"]
+    out += ["open items:"] + (["- " + x for x in _open(st)] or ["- none"])
+    for run in st["runs"]:
+        out.append("run %s %d · golden %s · %s · %s → %s" % (run["stage"], run["n"], run["version"], run["session"],
+                                                         run["started"], run["ended"] or "open"))
+        for g in run["gates"]:
+            ev = run["evidence"].get(g["id"])
+            out.append("  - %s: %s" % (g["id"], "pending (wants: %s)" % g["evidence_wanted"] if ev is None else
+                                       "passed at %s by %s%s\n    %s" % (
+                                           ev["at"], ev["session"],
+                                           " (carried from run %s)" % ev["carried_from"] if ev.get("carried_from") else "",
+                                           ev["text"].strip().replace("\n", "\n    "))))
+    return "\n".join(out) + "\n"
+
+
+def resume_view(root: Path, project: Path, d: Path, session: str) -> str:
     st = state.load(d)
-    return "task %s · %s · held by %s\n" % (st["id"], st["stage"], session)
+    run = st["runs"][-1]
+    n = STAGES.index(st["stage"]) + 1
+    status = "interrupted" if run["ended"] is None and run["session"] != session else st["status"]
+    passed = sorted((ev["at"], gid, ev["text"]) for r in st["runs"] for gid, ev in r["evidence"].items())
+    last = "%s (%s)" % (passed[-1][1], _first_line(passed[-1][2])) if passed else "none"
+    pending = [g["id"] for g in run["gates"] if g["id"] not in run["evidence"]]
+    rel = Path(".golden", "tasks", d.name, "stage-%d-brief.md" % n)
+    out = ["stage %d/6 %s (%s)" % (n, st["stage"], status),
+           "last passed gate: " + last,
+           "pending gates: " + (", ".join(pending) or "none"),
+           "open items: " + (" · ".join(_open(st)) or "none"),
+           "decisions: " + (" · ".join(x["text"] for x in st["decisions"]) or "none"),
+           "brief: " + rel.as_posix()]
+    if not (project / rel).is_file():
+        text, _ = brief.build_brief(root, project, st["stage"], st["kind"], task_id=st["id"])
+        fsutil.atomic_write(project / rel, text)
+        out.append("brief snapshot missing; regenerated")
+    return "\n".join(out) + "\n"
