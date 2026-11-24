@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, check, hooks, init, overlay, paths, profile, scan, session, state, task
+from golden import brief, check, contrib, hooks, init, overlay, paths, profile, scan, session, state, task
 from golden.practices import STAGES
 
 
@@ -84,6 +84,32 @@ def cmd_init(args) -> int:
         return 1
     except init.InitError as e:
         print("golden: %s" % e, file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_contrib(args) -> int:
+    proj = _project()
+    if proj is None:
+        return 3
+    root = paths.plugin_root()
+    try:
+        if args.sub == "new":
+            print(contrib.new(proj, " ".join(args.idea)), end="")
+        elif args.sub == "check":
+            text, passed = contrib.check(root, proj, args.slug)
+            print(text, end="")
+            return 0 if passed else 1
+        elif args.sub == "confirm":
+            print(contrib.confirm(root, proj, args.slug, args.verdict), end="")
+        elif args.sub == "discard":
+            print(contrib.discard(proj, args.slug, args.confirm), end="")
+    except contrib.ContribError as e:
+        print("golden: %s" % e, file=sys.stderr)
+        return e.code
+    except profile.ProfileError as e:
+        for line in e.errors:
+            print(line, file=sys.stderr)
         return 1
     return 0
 
@@ -265,6 +291,15 @@ def main(argv: list[str]) -> int:
     ro.add_argument("id")
     ro.add_argument("stage", choices=STAGES)
     ro.add_argument("--recheck", action="store_true", help="start the run without earlier evidence")
+    cb = sub.add_parser("contrib", help="send a practice upstream").add_subparsers(dest="sub", required=True)
+    cb.add_parser("new", help="start a contribution from an idea").add_argument("idea", nargs="+")
+    cb.add_parser("check", help="sanitize and check the draft").add_argument("slug")
+    cf = cb.add_parser("confirm", help="confirm the checked draft for sending")
+    cf.add_argument("slug")
+    cf.add_argument("--verdict", required=True, help="new | extends:<id> | duplicate:<id>")
+    dc = cb.add_parser("discard", help="delete a contribution draft")
+    dc.add_argument("slug")
+    dc.add_argument("--confirm", action="store_true")
     ck = sub.add_parser("check", help="check upstream content (default), for CI, a project's own files, or a release")
     ckm = ck.add_mutually_exclusive_group()
     ckm.add_argument("--ci", action="store_true", help="also leaks, glossary aliases, unknown terms, similarity")
@@ -294,6 +329,8 @@ def main(argv: list[str]) -> int:
         return cmd_override(args)
     if args.cmd == "task":
         return cmd_task(args, flag)
+    if args.cmd == "contrib":
+        return cmd_contrib(args)
     if args.cmd == "check":
         return cmd_check(args)
     if args.cmd == "scan":
