@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from golden import brief, hooks, overlay, paths, profile, session
+from golden import brief, hooks, overlay, paths, profile, session, task
 from golden.practices import STAGES
 
 
@@ -68,6 +68,44 @@ def cmd_brief(args) -> int:
     return 0
 
 
+def _session(flag) -> str | None:
+    sid = session.current_session(flag)
+    if not sid:
+        print("golden: no session id", file=sys.stderr)
+    return sid
+
+
+def cmd_task(args, flag) -> int:
+    proj = _project()
+    if proj is None:
+        return 3
+    root = paths.plugin_root()
+    if args.sub == "list":
+        print("\n".join(task.list_lines(root, proj)) or "no tasks")
+        return 0
+    sid = _session(flag)
+    if not sid:
+        return 3
+    try:
+        if args.sub == "start":
+            _, text = task.start(root, proj, sid, args.kind, " ".join(args.desc), args.link or [])
+            print(text, end="")
+            return 0
+        if args.sub == "takeover" and not args.confirm:
+            print("golden: taking over needs --confirm: golden task takeover %s --confirm" % args.id, file=sys.stderr)
+            return 2
+        d = (task.resume if args.sub == "resume" else task.takeover)(root, proj, sid, args.id)
+        print(task.resume_view(d, sid), end="")
+        return 0
+    except task.TaskError as e:
+        print("golden: %s" % e, file=sys.stderr)
+        return e.code
+    except profile.ProfileError as e:
+        for line in e.errors:
+            print(line, file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str]) -> int:
     argv, flag = session.extract_session_flag(argv)
     parser = argparse.ArgumentParser(prog="golden")
@@ -82,6 +120,17 @@ def main(argv: list[str]) -> int:
     br.add_argument("--kind", required=True)
     ovr = sub.add_parser("override", help="copy an upstream file to .golden/overrides, or: override list")
     ovr.add_argument("target", help="path under core/, or 'list'")
+    tk = sub.add_parser("task", help="start, list, resume or take over tasks").add_subparsers(dest="sub", required=True)
+    st = tk.add_parser("start", help="start a task: golden task start <kind> <description>")
+    st.add_argument("kind")
+    st.add_argument("desc", nargs="*")
+    st.add_argument("--link", action="append", help="display-only reference to a related task")
+    tk.add_parser("list", help="list tasks and who holds them")
+    for name in ("resume", "takeover"):
+        p = tk.add_parser(name)
+        p.add_argument("id")
+        if name == "takeover":
+            p.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
 
     if args.cmd == "profile":
@@ -90,6 +139,8 @@ def main(argv: list[str]) -> int:
         return cmd_brief(args)
     if args.cmd == "override":
         return cmd_override(args)
+    if args.cmd == "task":
+        return cmd_task(args, flag)
     if args.cmd == "hook":
         return hooks.run(args.name)
     if args.cmd == "whoami":

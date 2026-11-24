@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from golden import fsutil
+from golden import claim, fsutil, paths
 from golden.session import VALID_ID
 
 
@@ -15,7 +15,16 @@ def session_start(payload: dict) -> None:
         fsutil.append_text(Path(env_file), "export GOLDEN_SESSION_ID=%s\n" % sid)
 
 
-HOOKS = {"session-start": session_start}
+def heartbeat(payload: dict) -> None:
+    sid = payload.get("session_id") or ""
+    proj = paths.find_project(Path(payload.get("cwd") or os.getcwd()))
+    if proj is None or not VALID_ID.fullmatch(sid):
+        return
+    for d in (proj / ".golden" / "tasks").glob("T-*"):
+        claim.heartbeat(d, sid)
+
+
+HOOKS = {"session-start": session_start, "heartbeat": heartbeat}
 
 
 def run(name: str) -> int:

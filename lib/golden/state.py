@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from golden import claim, fsutil
+from golden import fsutil
 
 SCHEMA = 1
 STATUSES = ("active", "awaiting-merge", "cleanup-pending", "done", "abandoned")
@@ -45,6 +45,7 @@ def save(task_dir: Path, st: dict) -> None:
 
 
 def mutate(task_dir: Path, session: str, fn) -> dict:
+    from golden import claim  # claim imports state for timestamps
     with fsutil.locked(task_dir / "lock"):
         if not claim.holds(task_dir, session):
             raise StateError("you do not hold task %s" % task_dir.name)
