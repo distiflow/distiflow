@@ -69,10 +69,18 @@ def takeover(task_dir: Path, session: str, stale_after: float) -> None:
     lost = task_dir / ("claim.lost.%s.%s" % (h["session"], h.get("nonce", "x")))
     try:
         os.link(path, lost)
-        if os.stat(path).st_ino != os.stat(lost).st_ino:
-            raise LostRace()
     except (FileExistsError, FileNotFoundError):
         raise LostRace() from None
+    try:
+        # The linked file must still be the stale claim we judged; a renewed or replaced one is not ours to take.
+        same = (os.stat(path).st_ino == os.stat(lost).st_ino
+                and json.loads(lost.read_text(encoding="utf-8")).get("nonce") == h.get("nonce")
+                and int(time.time() - lost.stat().st_mtime) > stale_after)
+    except (OSError, ValueError):
+        same = False
+    if not same:
+        lost.unlink(missing_ok=True)
+        raise LostRace()
     os.unlink(path)
     try:
         claim(task_dir, session)

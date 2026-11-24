@@ -81,8 +81,16 @@ def list_lines(root: Path, project: Path) -> list[str]:
     return lines
 
 
+def _readable(d: Path) -> None:
+    try:
+        state.load(d)
+    except (ValueError, state.StateError) as e:
+        raise TaskError(str(e)) from None
+
+
 def resume(root: Path, project: Path, session: str, task_id: str) -> Path:
     d = task_dir(project, task_id)
+    _readable(d)  # never claim a task this golden cannot read
     h = claim.holder(d)
     if h is not None and h["session"] != session:
         if claim.is_stale(d, stale_after(root, project)):
@@ -103,6 +111,7 @@ def time_of(d: Path) -> float:
 
 def takeover(root: Path, project: Path, session: str, task_id: str) -> Path:
     d = task_dir(project, task_id)
+    _readable(d)
     try:
         claim.takeover(d, session, stale_after(root, project))
     except claim.NotStale:

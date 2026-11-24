@@ -104,9 +104,9 @@ def cmd_task(args, flag) -> int:
         d = (task.resume if args.sub == "resume" else task.takeover)(root, proj, sid, args.id)
         print(task.resume_view(root, proj, d, sid), end="")
         return 0
-    except task.TaskError as e:
+    except (task.TaskError, state.StateError, ValueError) as e:
         print("golden: %s" % e, file=sys.stderr)
-        return e.code
+        return getattr(e, "code", 1)
     except profile.ProfileError as e:
         for line in e.errors:
             print(line, file=sys.stderr)

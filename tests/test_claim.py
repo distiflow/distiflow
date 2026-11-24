@@ -1,5 +1,6 @@
 import json
 import os
+from unittest import mock
 import threading
 import time
 
@@ -133,3 +134,37 @@ class ClaimRace(ClaimCase):
         lines = r.stdout.splitlines()
         self.assertRegex(lines[0], r"^%s  understand  active  held by s-1 since \S+$" % a.name)
         self.assertRegex(lines[1], r"^%s  understand  active  held by s-2 since \S+ \(stale\)$" % b.name)
+
+
+class TakeoverWindow(ClaimCase):
+    def test_takeover_never_steals_a_fresh_claim(self):
+        """T6 I3 I2: a claim renewed between the stale check and the link is not taken."""
+        from golden import claim
+        task = self.start("s-1")
+        self.age(task, STALE + 1)
+        real = claim.is_stale
+
+        def stale_then_renewed(d, limit):
+            out = real(d, limit)
+            claim.release(d, "s-1")  # the old holder lets go and a third session claims, inside the window
+            claim.claim(d, "s-3")
+            return out
+
+        with mock.patch.object(claim, "is_stale", side_effect=stale_then_renewed):
+            with self.assertRaises(claim.LostRace):
+                claim.takeover(task, "s-2", STALE)
+        self.assertEqual((self.holder(task), list(task.glob("claim.lost.*"))), ("s-3", []))
+
+    def test_newer_state_resume_refused_cleanly(self):
+        """T13 I11 R48 I3: resume and takeover of newer state exit 1 with the update message and claim nothing."""
+        task = self.start("s-1")
+        st = json.loads((task / "state.json").read_text())
+        (task / "state.json").write_text(json.dumps({**st, "schema": 2}))
+        (task / "claim").unlink()
+        for cmd in (("resume", task.name), ("takeover", task.name, "--confirm")):
+            with self.subTest(cmd=cmd[0]):
+                r = self.golden("task", *cmd, cwd=self.proj, root=self.root, session="s-2")
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("update golden", r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+                self.assertFalse((task / "claim").exists())

@@ -34,6 +34,7 @@ class Hooks(GoldenCase):
         self.proj = self.repo()  # under the "gw tmp ü" parent: Review Focus 4
         self.wt = self.tmp / "proj.golden" / "T-1"
         (self.wt / "sub").mkdir(parents=True)
+        w(self.wt / ".golden" / "profile.toml", "")  # the committed profile is checked out in every worktree
         self.task = self.proj / ".golden" / "tasks" / "T-1"
 
     def claim(self, session):
@@ -100,6 +101,16 @@ class Hooks(GoldenCase):
         r = self.hook("guard", {"session_id": "s-1", "cwd": str(alias / "proj"), "tool_name": "Write",
                                 "tool_input": {"file_path": str(p)}})
         self.assert_decision(r, "deny", LOST_MSG)
+
+    def test_heartbeat_from_worktree(self):
+        """T6 I12 C1: a session working in its task worktree keeps its claim fresh."""
+        w(self.task / "state.json", json.dumps(state(worktree=str(self.wt))))
+        self.claim("s-1")
+        t = __import__("time").time() - 1000
+        __import__("os").utime(self.task / "claim", (t, t))
+        r = self.hook("heartbeat", {"session_id": "s-1", "cwd": str(self.wt / "sub")})
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        self.assertLess(__import__("time").time() - (self.task / "claim").stat().st_mtime, 100)
 
     def test_guard_survives_garbage_stdin(self):
         """R33 Review Focus 5: a hook never blocks on input it cannot read."""

@@ -16,15 +16,14 @@ def version(root: Path) -> str:
 def find_project(cwd: Path) -> Path | None:
     """The project holding .golden/ around cwd; a task worktree dir <x>.golden/<id> maps back to <x>. No git."""
     cwd = Path(cwd).absolute()
-    for d in (cwd, *cwd.parents):
-        if (d / ".golden").is_dir():
-            return d
-        if d.name.endswith(".golden") and d != cwd:
+    chain = (cwd, *cwd.parents)
+    # Worktree mapping first: a worktree holds its own checked-out .golden/ with the committed profile.
+    for d in chain[1:]:
+        if d.name.endswith(".golden") and d.name != ".golden":
             main = d.with_name(d.name[: -len(".golden")])
-            child = cwd.relative_to(d).parts[0]
-            if (main / ".golden" / "tasks" / child).is_dir():
+            if (main / ".golden" / "tasks" / cwd.relative_to(d).parts[0]).is_dir():
                 return main
-    return None
+    return next((d for d in chain if (d / ".golden").is_dir()), None)
 
 
 def project_root(start: Path) -> Path | None:

@@ -1,4 +1,5 @@
 import contextlib
+import fcntl
 import os
 import secrets
 import time
@@ -44,38 +45,21 @@ def atomic_write(path: Path, data: str | bytes) -> None:
         raise
 
 
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
 @contextlib.contextmanager
 def locked(path: Path, timeout: float = 10.0):
+    """Exclusive per-file lock; the kernel drops it when the holder dies, so a stale lock never needs breaking."""
     deadline = time.monotonic() + timeout
-    while True:
-        try:
-            create_exclusive(path, str(os.getpid()))
-            break
-        except FileExistsError:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        while True:
             try:
-                pid = int(path.read_text() or "0")
-            except (FileNotFoundError, ValueError):
-                pid = None
-            # A lock whose writer died is moved aside under a unique name, so two breakers cannot both win.
-            if pid is not None and not _alive(pid):
-                with contextlib.suppress(FileNotFoundError):
-                    os.rename(path, path.with_name("%s.dead.%d.%d" % (path.name, pid, os.getpid())))
-                continue
-            if time.monotonic() > deadline:
-                raise TimeoutError("lock %s held by pid %s" % (path, pid))
-            time.sleep(0.01)
-    try:
-        yield
-    finally:
-        with contextlib.suppress(FileNotFoundError):
-            path.unlink()
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError("lock %s still held after %ss" % (path, timeout)) from None
+                time.sleep(0.01)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)

@@ -76,8 +76,37 @@ class State(GoldenCase):
         lock = self.tmp / "lock"
         lock.write_text("999999999")
         with fsutil.locked(lock, timeout=2):
-            self.assertEqual(lock.read_text(), str(__import__("os").getpid()))
-        self.assertFalse(lock.exists())
+            pass
+
+    def test_breaking_a_dead_lock_admits_one_holder(self):
+        """F5 R21 I1: two waiters on a dead lock never both get in, whichever one breaks it."""
+        import os, threading, time
+        lock = self.tmp / "lock"
+        lock.write_text("999999999")
+        real_rename, calls, inside, overlap = os.rename, [], [], []
+
+        def slow_first_rename(*a, **kw):
+            calls.append(1)
+            if len(calls) == 1:
+                time.sleep(0.3)  # the first breaker stalls after deciding the holder is dead
+            return real_rename(*a, **kw)
+
+        def worker(delay):
+            time.sleep(delay)
+            with fsutil.locked(lock, timeout=5):
+                inside.append(1)
+                if len(inside) > 1:
+                    overlap.append(1)
+                time.sleep(0.5)
+                inside.pop()
+
+        with mock.patch("os.rename", side_effect=slow_first_rename):
+            ts = [threading.Thread(target=worker, args=(d,)) for d in (0, 0.1)]
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join()
+        self.assertEqual(overlap, [])
 
     def test_single_writer_sweep(self):
         """T13 F6: fsutil.py is the only module that opens golden files for writing."""
