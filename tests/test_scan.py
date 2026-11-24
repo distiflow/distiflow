@@ -19,6 +19,7 @@ ROWS = [
     ("meet at 10:30:00", [], None), ("short term ab", ["ab"], None),
     ("bind 127.0.0.1 or ::1", [], None), ("ｓｌｏｔｓｅｒｖ", ["slotserv"], "deny-term"),
     ("advance without evidence when busy", [], "gate-bypass"),
+    ("edit profile.local.toml", [], None), ("db1.internal.", [], "host"),
 ]
 
 

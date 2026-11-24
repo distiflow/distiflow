@@ -23,7 +23,7 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 # Bare hosts need a known TLD, so code identifiers such as os.path never count as hosts.
 TLDS = ("com net org io dev app cloud co ai gg me info biz xyz tech site online us uk de eu fr nl pl ua ru ca au "
         "in jp cn br es it ch se no internal local lan corp intra private").split()
-HOST = re.compile(r"(?<![\w@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:%s))(?![\w-])" % "|".join(TLDS), re.I)
+HOST = re.compile(r"(?<![\w@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:%s))(?![\w-]|\.\w)" % "|".join(TLDS), re.I)
 ALLOWED_HOSTS = ("localhost", "example.com", "example.org", "example.net")
 IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 IPV6 = re.compile(r"(?<![\w:])[0-9a-fA-F:]*:[0-9a-fA-F:]*:[0-9a-fA-F:]*(?![\w:])")
